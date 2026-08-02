@@ -21,6 +21,16 @@ from typing import Awaitable, Callable, Optional
 OnEvent = Callable[[dict], Awaitable[None]]
 
 
+def _upstream_log():
+    """上游輸出寫到 ~/.konjac/jt-upstream.log(取代丟棄,便於診斷)。"""
+    try:
+        log_dir = Path.home() / ".konjac"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        return open(log_dir / "jt-upstream.log", "ab")
+    except OSError:
+        return asyncio.subprocess.DEVNULL
+
+
 async def _auto_confirm(proc: asyncio.subprocess.Process) -> None:
     """上游即使參數齊全仍會問「確認開始?(Y/n)」(_confirm_start),
     經 stdin 送 y 自動確認;pipe 保持開啟避免後續 read 收到 EOF 取消。"""
@@ -104,13 +114,25 @@ class JtLiveBridge:
 
         env = dict(os.environ)
         env["KONJAC_JT_PORT"] = str(actual_port)
+        # live 必要參數(Windows):
+        # --asr faster-whisper:whisper.cpp 未編譯,用已裝的 faster-whisper CUDA
+        # -d -100:WASAPI Loopback sentinel,跳過會 hard-exit 的 GGML 模型探測
+        log = _upstream_log()
         self._proc = await asyncio.create_subprocess_exec(
             self._cfg.python_exe, str(self._cfg.script),
-            "--webui", "--mode", mode, *self._cfg.extra_args,
+            "--webui", "--mode", mode,
+            "--asr", "faster-whisper", "--local-asr", "-d", "-100",
+            *self._cfg.extra_args,
             cwd=str(self._cfg.script.parent), env=env,
             stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+            stdout=log, stderr=asyncio.subprocess.STDOUT)
         await _auto_confirm(self._proc)
+
+    async def wait_proc(self) -> int | None:
+        """等待子程序結束,回傳 returncode(給 LiveRunner 看門狗用)。"""
+        if self._proc is None:
+            return None
+        return await self._proc.wait()
 
     async def _handle_conn(self, reader: asyncio.StreamReader,
                            writer: asyncio.StreamWriter) -> None:

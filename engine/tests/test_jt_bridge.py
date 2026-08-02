@@ -87,6 +87,23 @@ def test_live_bridge_ws_replay(client):
     client.post(f"/api/sessions/{sid}/stop")
 
 
+def test_live_watchdog_marks_error_on_process_death(client, monkeypatch):
+    """上游 live 程序異常結束 → 看門狗把 session 標記 error 並廣播。"""
+    monkeypatch.setenv("KONJAC_FAKE_LIVE_CRASH", "1")
+    r = client.post("/api/live/start", json={"title": "崩潰測試", "kind": "live"})
+    assert r.status_code == 201
+    sid = r.json()["id"]
+
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        s = client.get(f"/api/sessions/{sid}").json()["session"]
+        if s["status"] == "error":
+            break
+        time.sleep(0.2)
+    assert s["status"] == "error"
+    assert s["ended_at"] is not None
+
+
 def test_live_unavailable_when_script_missing():
     missing = JtBridgeConfig(script=Path("D:/nope/translate_meeting.py"), port=0)
 

@@ -46,7 +46,11 @@ def main() -> None:
     parser.add_argument("--input", nargs="+", default=None)
     parser.add_argument("--local-asr", action="store_true")
     parser.add_argument("--diarize", action="store_true")
-    args = parser.parse_args()
+    # 上游 live 參數(引擎會帶),fake 接受即可
+    args, _unknown = parser.parse_known_args()
+
+    if os.environ.get("KONJAC_FAKE_LIVE_CRASH") == "1" and not args.input:
+        raise SystemExit(3)  # 模擬上游 live 啟動後立刻崩潰
 
     port = int(os.environ.get("KONJAC_JT_PORT", "19780"))
     conn = None

@@ -75,6 +75,7 @@ class LiveRunner:
         self._topic = topic
         self._llm_getter = llm_getter or (lambda: None)
         self._on_caption = on_caption  # 關鍵字/webhook 等後處理 hook
+        self._stopping = False
 
     @property
     def running(self) -> bool:
@@ -83,8 +84,22 @@ class LiveRunner:
     async def start(self, mode: str) -> None:
         self._t0 = time.monotonic()
         await self._bridge.start(mode)
+        asyncio.ensure_future(self._watch_process())
+
+    async def _watch_process(self) -> None:
+        """看門狗:上游程序死亡(非正常停止)→ session 標記 error 並通知前端,
+        避免 UI 永遠卡在 recording。"""
+        rc = await self._bridge.wait_proc()
+        if self._stopping:
+            return  # 正常停止流程,由 stop() 收尾
+        self._store.set_status(self._sid, SessionStatus.error, ended=True)
+        await self._hub.broadcast(self._sid, WsEvent(
+            type="status",
+            data={"status": "error",
+                  "detail": f"AI 管線程序異常結束(rc={rc}),請查看引擎日誌"}))
 
     async def stop(self) -> None:
+        self._stopping = True
         await self._bridge.stop()
 
     async def on_event(self, event: dict) -> None:
