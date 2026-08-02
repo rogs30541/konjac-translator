@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "翻譯蒟蒻",
+  "version": "0.1.0",
+  "description": "即時字幕側欄、分頁錄音轉錄翻譯、一鍵轉發 NotebookLM(需本地翻譯蒟蒻引擎)",
+  "permissions": ["sidePanel", "tabCapture", "storage", "activeTab", "clipboardWrite"],
+  "host_permissions": [
+    "http://127.0.0.1:8765/*",
+    "https://notebooklm.google.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "action": { "default_title": "翻譯蒟蒻 — 開啟側欄" },
+  "content_scripts": [
+    {
+      "matches": ["https://notebooklm.google.com/*"],
+      "js": ["content-notebooklm.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" }
+}

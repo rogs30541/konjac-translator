@@ -1,0 +1,36 @@
+{
+  "note": "TTS bootstrap baseline; model=large-v3-turbo local CUDA",
+  "fixtures": {
+    "fx01_en": {
+      "wer": 0.0,
+      "segments": 6,
+      "seconds": 22.1
+    },
+    "fx01_zh": {
+      "cer": 0.0119,
+      "segments": 5,
+      "seconds": 24.3
+    },
+    "fx02_dialog": {
+      "wer": 0.0,
+      "segments": 8,
+      "speakers_detected": 2,
+      "speakers_expected": 2,
+      "seconds": 23.8
+    },
+    "fx07_silence": {
+      "captions": 0,
+      "hallucinated_chars": 0,
+      "seconds": 11.9,
+      "pass": true
+    },
+    "fx07_tiny": {
+      "ok": true,
+      "captions": 0
+    },
+    "fx07_corrupt": {
+      "ok": true,
+      "error_type": "RuntimeError"
+    }
+  }
+}

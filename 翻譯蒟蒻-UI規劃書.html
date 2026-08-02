@@ -1,0 +1,418 @@
+<meta charset="utf-8">
+<title>翻譯蒟蒻 — UI 規劃書</title>
+<style>
+  :root{
+    --bg:#12141a; --panel:#1b1e27; --panel2:#232734; --line:#2e3342;
+    --tx:#e8eaf0; --tx2:#9aa1b4; --tx3:#6b7288;
+    --brand:#ff8fa3; --brand-deep:#e5637e; --brand-soft:rgba(255,143,163,.14);
+    --teal:#4dd6c1; --amber:#ffc46b; --blue:#6ea8ff; --violet:#b18cff;
+    --ok:#5ad08a; --mono:'Cascadia Code','Consolas',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--tx);font-family:'Segoe UI','Noto Sans TC',sans-serif;line-height:1.6}
+  .wrap{max-width:1180px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:34px;letter-spacing:.02em}
+  h1 .konjac{color:var(--brand)}
+  .sub{color:var(--tx2);margin:8px 0 0;font-size:15px}
+  h2{font-size:22px;margin:72px 0 8px;padding-top:24px;border-top:1px solid var(--line)}
+  h2 .no{color:var(--brand);font-family:var(--mono);font-size:16px;margin-right:10px}
+  .lead{color:var(--tx2);font-size:14px;margin-bottom:24px;max-width:820px}
+  .chip{display:inline-block;font-size:11px;padding:2px 10px;border-radius:99px;border:1px solid var(--line);color:var(--tx2);margin-left:8px;vertical-align:3px}
+
+  /* ===== design tokens section ===== */
+  .tokens{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  .tok{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .sw{height:44px;border-radius:8px;margin-bottom:10px}
+  .tok b{font-size:13px;display:block}
+  .tok span{font-size:11.5px;color:var(--tx3);font-family:var(--mono)}
+  .principles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:18px}
+  .pr{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .pr b{color:var(--brand);display:block;margin-bottom:6px;font-size:14px}
+  .pr p{font-size:13px;color:var(--tx2)}
+
+  /* ===== mockup frames ===== */
+  .frame{background:#0c0e13;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  .tbar{display:flex;align-items:center;gap:8px;background:#171a22;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .tbar .t{margin-left:8px;font-size:12.5px;color:var(--tx2)}
+  .note{display:flex;gap:10px;font-size:13px;color:var(--tx2);margin:14px 0 0;align-items:baseline}
+  .note b{color:var(--brand);font-family:var(--mono);flex:none}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+
+  /* ===== app shell mock ===== */
+  .app{display:grid;grid-template-columns:190px 1fr 230px;min-height:560px}
+  .nav{background:#141720;border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+  .logo{display:flex;align-items:center;gap:9px;padding:6px 10px 18px;font-weight:700;font-size:15px}
+  .logo i{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--brand-deep));display:inline-block;flex:none}
+  .nv{padding:9px 12px;border-radius:9px;font-size:13.5px;color:var(--tx2);display:flex;gap:9px;align-items:center}
+  .nv.on{background:var(--brand-soft);color:var(--brand);font-weight:600}
+  .nv em{font-style:normal;width:16px;text-align:center}
+  .nav .grow{flex:1}
+  .eng{margin:0 6px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:11.5px;color:var(--tx2)}
+  .eng b{display:flex;align-items:center;gap:6px;color:var(--ok);font-size:12px;margin-bottom:3px}
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+
+  .main{padding:0;display:flex;flex-direction:column;min-width:0}
+  .ctl{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .sel{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;font-size:12.5px;color:var(--tx);display:inline-flex;align-items:center;gap:7px}
+  .sel small{color:var(--tx3)}
+  .sel .car{color:var(--tx3);font-size:9px}
+  .rec{margin-left:auto;background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#1c0d12;font-weight:700;border-radius:9px;padding:9px 20px;font-size:13.5px;display:inline-flex;gap:8px;align-items:center}
+  .rec i{width:9px;height:9px;background:#1c0d12;border-radius:2px;display:inline-block}
+  .timer{font-family:var(--mono);font-size:13px;color:var(--tx2)}
+
+  .stream{flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+  .cap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 15px}
+  .cap .mh{display:flex;gap:9px;align-items:center;margin-bottom:7px;font-size:11.5px;color:var(--tx3)}
+  .spk{padding:1px 9px;border-radius:99px;font-size:11px;font-weight:600}
+  .s1{background:rgba(110,168,255,.16);color:var(--blue)}
+  .s2{background:rgba(77,214,193,.16);color:var(--teal)}
+  .s3{background:rgba(255,196,107,.16);color:var(--amber)}
+  .cap .src{font-size:12.5px;color:var(--tx3);margin-bottom:4px}
+  .cap .dst{font-size:15.5px}
+  .cap.live{border-color:var(--brand-deep);box-shadow:0 0 0 1px var(--brand-soft)}
+  .cap .cur{display:inline-block;width:8px;height:15px;background:var(--brand);vertical-align:-2px;margin-left:3px;animation:bl 1s infinite}
+  @keyframes bl{50%{opacity:0}}
+  .abar{display:flex;gap:10px;padding:12px 18px;border-top:1px solid var(--line)}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--tx);border-radius:9px;padding:8px 15px;font-size:12.5px}
+  .btn.pri{background:var(--brand-soft);border-color:var(--brand-deep);color:var(--brand);font-weight:600}
+
+  .side{background:#141720;border-left:1px solid var(--line);padding:16px 14px;font-size:12.5px}
+  .side h4{font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 10px}
+  .side h4:first-child{margin-top:0}
+  .sprow{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px}
+  .sprow:hover{background:var(--panel2)}
+  .swd{width:10px;height:10px;border-radius:3px;flex:none}
+  .sprow .nm{flex:1}
+  .sprow .pen{color:var(--tx3);font-size:11px}
+  .kw{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:3px 10px;margin:0 6px 6px 0;font-size:11.5px;color:var(--tx2)}
+  .kw.hit{border-color:var(--amber);color:var(--amber)}
+
+  /* ===== overlay mock ===== */
+  .desk{position:relative;height:330px;background:linear-gradient(160deg,#1d2633,#10151d);display:flex;align-items:flex-end;justify-content:center;padding:24px}
+  .deskhint{position:absolute;top:16px;left:20px;font-size:12px;color:var(--tx3)}
+  .meetwin{position:absolute;inset:40px 60px 110px;background:#0d1117;border:1px solid #2a3040;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#3b4256;font-size:13px}
+  .ovl{position:relative;width:78%;background:rgba(10,12,16,.82);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px 20px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
+  .ovl .o1{font-size:12.5px;color:#aeb6c8;margin-bottom:3px}
+  .ovl .o2{font-size:18px;font-weight:600}
+  .ovl .tools{position:absolute;top:-14px;right:14px;display:flex;gap:6px}
+  .ovl .tools i{width:26px;height:26px;border-radius:8px;background:#232734;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:12px;color:var(--tx2)}
+
+  /* ===== library / offline ===== */
+  .lib{display:grid;grid-template-columns:250px 1fr;min-height:480px}
+  .liblist{border-right:1px solid var(--line);background:#141720;padding:12px}
+  .search{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:12.5px;color:var(--tx3);margin-bottom:10px}
+  .li{padding:10px 11px;border-radius:9px;margin-bottom:4px}
+  .li.on{background:var(--brand-soft)}
+  .li b{font-size:12.5px;display:block}
+  .li span{font-size:11px;color:var(--tx3)}
+  .li .tags{margin-top:4px}
+  .tag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:99px;background:var(--panel2);color:var(--tx2);margin-right:4px}
+  .libmain{padding:18px 20px}
+  .sumbox{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:10px;padding:14px 16px;margin:12px 0}
+  .sumbox h5{font-size:12px;color:var(--brand);margin-bottom:8px}
+  .sumbox li{font-size:13px;color:var(--tx2);margin-left:18px;margin-bottom:4px}
+  .exports{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+
+  .drop{border:2px dashed var(--line);border-radius:14px;padding:34px;text-align:center;color:var(--tx3);font-size:13.5px;margin:16px}
+  .drop b{color:var(--tx2)}
+  .q{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--line);font-size:12.5px}
+  .q .fn{width:190px;font-family:var(--mono);font-size:12px}
+  .bar{flex:1;height:7px;background:var(--panel2);border-radius:99px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--brand),var(--brand-deep))}
+  .pct{font-family:var(--mono);color:var(--tx2);width:70px;text-align:right}
+  .opts{display:flex;gap:14px;padding:12px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--tx2);flex-wrap:wrap}
+  .ck{display:inline-flex;gap:6px;align-items:center}
+  .ck i{width:14px;height:14px;border-radius:4px;border:1px solid var(--line);display:inline-block;background:var(--panel2)}
+  .ck.on i{background:var(--brand);border-color:var(--brand)}
+
+  /* ===== chrome sidepanel ===== */
+  .browser{display:grid;grid-template-columns:1fr 300px;min-height:480px}
+  .page{background:#0d1117;position:relative;display:flex;align-items:center;justify-content:center}
+  .video{width:82%;aspect-ratio:16/9;background:linear-gradient(150deg,#1c2431,#12161f);border-radius:10px;position:relative;display:flex;align-items:center;justify-content:center;color:#3b4256;font-size:13px}
+  .vsub{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);width:88%;background:rgba(8,10,14,.85);border-radius:9px;padding:8px 14px;text-align:center}
+  .vsub .a{font-size:11px;color:#9aa1b4}
+  .vsub .b{font-size:14.5px;font-weight:600}
+  .panel{background:#151821;border-left:1px solid var(--line);display:flex;flex-direction:column}
+  .ph{padding:13px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .ph i{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--brand),var(--brand-deep));flex:none}
+  .ph b{font-size:13px}
+  .stat{margin-left:auto;font-size:10.5px;color:var(--ok);display:flex;gap:5px;align-items:center}
+  .pctl{display:flex;gap:7px;padding:11px 12px;border-bottom:1px solid var(--line)}
+  .pbtn{flex:1;text-align:center;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 4px;font-size:11.5px;color:var(--tx2)}
+  .pbtn.on{background:var(--brand-soft);border-color:var(--brand-deep);color:var(--brand);font-weight:600}
+  .pcaps{flex:1;padding:11px 12px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+  .pcap{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:11.5px}
+  .pcap .o{color:var(--tx3);margin-bottom:2px;font-size:11px}
+  .pcap .z{font-size:12.5px}
+  .pfoot{padding:11px 12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
+  .nblm{background:#1a2030;border:1px solid #2c3a5c;color:#8ab0ff;border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:600}
+
+  /* ===== modal ===== */
+  .modalstage{background:rgba(6,8,12,.7);padding:44px;display:flex;justify-content:center}
+  .modal{width:520px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .modal h3{font-size:16px;margin-bottom:4px}
+  .modal .ms{font-size:12.5px;color:var(--tx3);margin-bottom:16px}
+  .fld{margin-bottom:13px}
+  .fld label{display:block;font-size:11.5px;color:var(--tx3);margin-bottom:5px}
+  .inp{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:13px;display:flex;justify-content:space-between;color:var(--tx)}
+  .radio{display:flex;gap:9px}
+  .rd{flex:1;border:1px solid var(--line);border-radius:9px;padding:9px;text-align:center;font-size:12px;color:var(--tx2)}
+  .rd.on{border-color:var(--brand-deep);background:var(--brand-soft);color:var(--brand);font-weight:600}
+  .prev{background:#12141b;border:1px solid var(--line);border-radius:9px;padding:11px 13px;font-family:var(--mono);font-size:11px;color:var(--tx2);line-height:1.7;max-height:120px;overflow:hidden}
+  .macts{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}
+
+  /* flow */
+  .flow{display:flex;gap:0;flex-wrap:wrap;align-items:center;margin-top:16px}
+  .fstep{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 16px;font-size:12.5px;max-width:200px}
+  .fstep b{display:block;color:var(--brand);font-size:12px;margin-bottom:3px}
+  .fstep span{color:var(--tx2);font-size:11.5px}
+  .farrow{color:var(--tx3);padding:0 10px;font-size:16px}
+</style>
+
+<div class="wrap">
+  <h1>翻譯蒟蒻 <span class="konjac">UI 規劃書</span></h1>
+  <p class="sub">多功能即時語音紀錄工具 — 桌面 App(Tauri)+ Chrome 擴充 的介面設計規範與視覺稿|v0.1 · 2026-07-13</p>
+
+  <!-- ============ 0 設計原則 ============ -->
+  <h2><span class="no">00</span>設計原則與設計語彙</h2>
+  <p class="lead">介面為「長時間掛在旁邊看字幕」而設計:深色為主、低視覺噪音、字幕永遠是畫面主角。品牌取「翻譯蒟蒻」意象,以蒟蒻粉紅作為唯一強調色,其餘顏色保留給講者辨識。</p>
+  <div class="principles">
+    <div class="pr"><b>字幕優先</b><p>任何畫面中,字幕流的字級最大、對比最高;控制項全部退居邊緣,錄製中甚至可全部隱藏。</p></div>
+    <div class="pr"><b>單一強調色</b><p>蒟蒻粉只用於「主要動作」與「進行中狀態」;藍/綠/橙/紫四色專屬講者,不與 UI 狀態混用。</p></div>
+    <div class="pr"><b>狀態永遠可見</b><p>引擎連線、GPU/CPU 模式、延遲毫秒數常駐顯示——本地 AI 工具的信任感來自透明。</p></div>
+    <div class="pr"><b>三端一致</b><p>桌面 App、Chrome 側欄、WebUI 共用同一套字幕卡片元件與色彩 token,只改佈局不改語彙。</p></div>
+  </div>
+
+  <div style="margin-top:22px" class="tokens">
+    <div class="tok"><div class="sw" style="background:#ff8fa3"></div><b>蒟蒻粉 Brand</b><span>#FF8FA3 / 主動作·錄製中</span></div>
+    <div class="tok"><div class="sw" style="background:#12141a;border:1px solid #2e3342"></div><b>底色 BG</b><span>#12141A / 主背景</span></div>
+    <div class="tok"><div class="sw" style="background:#1b1e27"></div><b>面板 Panel</b><span>#1B1E27 / 卡片</span></div>
+    <div class="tok"><div class="sw" style="background:#6ea8ff"></div><b>講者 1</b><span>#6EA8FF</span></div>
+    <div class="tok"><div class="sw" style="background:#4dd6c1"></div><b>講者 2</b><span>#4DD6C1</span></div>
+    <div class="tok"><div class="sw" style="background:#ffc46b"></div><b>講者 3</b><span>#FFC46B</span></div>
+    <div class="tok"><div class="sw" style="background:#b18cff"></div><b>講者 4</b><span>#B18CFF</span></div>
+    <div class="tok"><div class="sw" style="display:flex;align-items:center;justify-content:center;background:#1b1e27;font-size:15px">中文 Aa</div><b>字體</b><span>Noto Sans TC / 系統字</span></div>
+  </div>
+  <div class="note"><b>※</b>字級規範:譯文 15.5–18px(主角)、原文 12.5px(輔助)、metadata 11px。淺色主題為 Phase 2 選配,token 已預留。</div>
+
+  <!-- ============ 1 桌面主視窗 ============ -->
+  <h2><span class="no">01</span>桌面 App — 即時模式主視窗<span class="chip">Tauri · 預設 1100×720</span></h2>
+  <p class="lead">三欄佈局:左側導覽 + 引擎狀態、中央字幕流、右側講者與關鍵字面板(可收合)。錄製中點「專注模式」可隱藏左右欄,只留字幕。</p>
+
+  <div class="frame">
+    <div class="tbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="t">翻譯蒟蒻 — 即時轉錄</span></div>
+    <div class="app">
+      <div class="nav">
+        <div class="logo"><i></i>翻譯蒟蒻</div>
+        <div class="nv on"><em>●</em>即時模式</div>
+        <div class="nv"><em>▤</em>離線處理</div>
+        <div class="nv"><em>▦</em>紀錄庫</div>
+        <div class="nv"><em>⚙</em>設定</div>
+        <div class="grow"></div>
+        <div class="eng"><b><span class="pulse"></span>引擎已連線</b>faster-whisper · CUDA<br>延遲 0.7s · Ollama qwen2.5</div>
+      </div>
+      <div class="main">
+        <div class="ctl">
+          <span class="sel">🔊 系統音訊 + 🎙 麥克風 <span class="car">▼</span></span>
+          <span class="sel">英 → 繁中 <span class="car">▼</span></span>
+          <span class="sel"><small>主題</small> 產品開發會議 <span class="car">▼</span></span>
+          <span class="timer">00:14:32</span>
+          <span class="rec"><i></i>停止錄製</span>
+        </div>
+        <div class="stream">
+          <div class="cap">
+            <div class="mh"><span class="spk s1">Speaker 1 · 王經理</span><span>00:13:58</span><span>🔊 系統音訊</span></div>
+            <div class="src">We need to finalize the Q3 roadmap before the end of this sprint.</div>
+            <div class="dst">我們需要在這個 sprint 結束前確定第三季的產品路線圖。</div>
+          </div>
+          <div class="cap">
+            <div class="mh"><span class="spk s2">Speaker 2 · Sarah</span><span>00:14:10</span><span>🔊 系統音訊</span></div>
+            <div class="src">The speaker diarization module still needs another round of testing.</div>
+            <div class="dst">講者辨識模組還需要再進行一輪測試。</div>
+          </div>
+          <div class="cap live">
+            <div class="mh"><span class="spk s3">我(麥克風)</span><span>00:14:29</span><span>🎙 麥克風</span></div>
+            <div class="src">好,那我這邊先把測試計畫整理出來…</div>
+            <div class="dst">OK, I'll put together the test plan on my side first…<span class="cur"></span></div>
+          </div>
+        </div>
+        <div class="abar">
+          <span class="btn">⭐ 標記重點</span>
+          <span class="btn">🪟 懸浮字幕</span>
+          <span class="btn">🧘 專注模式</span>
+          <span style="flex:1"></span>
+          <span class="btn">✨ 產生摘要</span>
+          <span class="btn pri">📤 轉發 NotebookLM</span>
+        </div>
+      </div>
+      <div class="side">
+        <h4>講者(3)</h4>
+        <div class="sprow"><span class="swd" style="background:var(--blue)"></span><span class="nm">王經理</span><span class="pen">✎</span></div>
+        <div class="sprow"><span class="swd" style="background:var(--teal)"></span><span class="nm">Sarah</span><span class="pen">✎</span></div>
+        <div class="sprow"><span class="swd" style="background:var(--amber)"></span><span class="nm">我(麥克風)</span><span class="pen">✎</span></div>
+        <h4>關鍵字通知</h4>
+        <span class="kw hit">roadmap ⚡2</span><span class="kw">deadline</span><span class="kw">budget</span><span class="kw">+ 新增</span>
+        <h4>重點標記(2)</h4>
+        <div style="font-size:11.5px;color:var(--tx2)">⭐ 00:08:12 Q3 路線圖需求確認<br>⭐ 00:11:40 測試資源不足議題</div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>a.</b>頂部控制列:音訊來源(系統/麥克風/雙向)、翻譯模式、會議主題(注入 LLM 提升術語翻譯)——錄製中仍可切換翻譯模式。</div>
+  <div class="note"><b>b.</b>字幕卡片 = 三端共用元件:講者色票 + 時戳 + 來源 → 原文(小字灰)→ 譯文(大字白)。進行中卡片以粉框 + 游標動畫表示 streaming。</div>
+  <div class="note"><b>c.</b>雙向模式下「我方麥克風」自動反向翻譯(中→英),供跨語會議即時對照自己的發言。</div>
+  <div class="note"><b>d.</b>右欄講者可即時改名,改名後全文與之後的摘要同步套用;關鍵字命中會閃橙色並發系統通知。</div>
+  <div class="note"><b>e.</b>全域快捷鍵(參考 GPT-Typeless):Ctrl+Shift+R 開始/停止、Ctrl+Shift+M 標記重點、Ctrl+Shift+O 懸浮字幕開關。</div>
+
+  <!-- ============ 2 懸浮字幕 ============ -->
+  <h2><span class="no">02</span>懸浮字幕視窗<span class="chip">置頂 · 半透明 · 可拖曳</span></h2>
+  <p class="lead">疊在任何應用程式(會議軟體、簡報、遊戲)上方的極簡字幕條。滑鼠移入才顯示工具鈕;支援點擊穿透模式,不干擾底下操作。</p>
+  <div class="frame">
+    <div class="desk">
+      <span class="deskhint">桌面(底下是 Google Meet / Webex / 任何視窗)</span>
+      <div class="meetwin">會議軟體視窗</div>
+      <div class="ovl">
+        <div class="tools"><i>Aa</i><i>◐</i><i>📌</i><i>✕</i></div>
+        <div class="o1"><span class="spk s2" style="font-size:10px">Sarah</span>&nbsp; The speaker diarization module still needs another round of testing.</div>
+        <div class="o2">講者辨識模組還需要再進行一輪測試。</div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>a.</b>顯示最新 1–2 句;工具鈕(hover 顯示):字級、透明度、釘選位置、關閉。原文列可關閉只留譯文。</div>
+  <div class="note"><b>b.</b>預設寬度 70% 螢幕、貼底部;位置與樣式記憶於設定。多螢幕時可指定顯示器。</div>
+
+  <!-- ============ 3 紀錄庫 + 離線處理 ============ -->
+  <h2><span class="no">03</span>紀錄庫 與 離線處理</h2>
+  <div class="grid2">
+    <div>
+      <div class="frame">
+        <div class="tbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="t">紀錄庫</span></div>
+        <div class="lib">
+          <div class="liblist">
+            <div class="search">🔍 全文搜尋…</div>
+            <div class="li on"><b>產品開發會議</b><span>今天 14:00 · 52 分 · 3 位講者</span><div class="tags"><span class="tag">會議</span><span class="tag">已摘要</span><span class="tag" style="color:#8ab0ff">已轉發 NBLM</span></div></div>
+            <div class="li"><b>客戶訪談 — ACME</b><span>7/11 · 38 分 · 2 位講者</span><div class="tags"><span class="tag">訪談</span><span class="tag">已摘要</span></div></div>
+            <div class="li"><b>podcast_ep12.mp3</b><span>7/10 · 離線批次 · 1 小時 6 分</span><div class="tags"><span class="tag">離線</span></div></div>
+          </div>
+          <div class="libmain">
+            <b style="font-size:15px">產品開發會議</b>
+            <div style="font-size:11.5px;color:var(--tx3);margin-top:2px">2026-07-13 14:00 · 英→繁中 · faster-whisper large-v3</div>
+            <div class="sumbox">
+              <h5>✨ AI 摘要</h5>
+              <li>確認 Q3 路線圖須於本 sprint 結束前定案(王經理)</li>
+              <li>講者辨識模組需再一輪測試,測試計畫由我方提供</li>
+              <li>待辦:測試資源盤點(Sarah,週五前)</li>
+            </div>
+            <div style="font-size:12px;color:var(--tx2)">[00:13:58] <span style="color:var(--blue)">王經理</span>:我們需要在這個 sprint 結束前確定第三季的產品路線圖。<br>[00:14:10] <span style="color:var(--teal)">Sarah</span>:講者辨識模組還需要再進行一輪測試。…</div>
+            <div class="exports">
+              <span class="btn">MD</span><span class="btn">TXT</span><span class="btn">HTML</span><span class="btn">SRT</span><span class="btn">VTT</span>
+              <span class="btn">🔄 重新摘要</span><span class="btn pri">📤 NotebookLM</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="note"><b>a.</b>左列 session 清單:搜尋、標籤篩選;「已轉發 NBLM」徽章避免重複轉發。右側 = 摘要置頂 + 可捲動逐字稿 + 匯出列。</div>
+    </div>
+    <div>
+      <div class="frame">
+        <div class="tbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="t">離線處理</span></div>
+        <div class="drop">⬇ 拖曳音訊檔到這裡<br><b>mp3 · wav · m4a · flac</b> — 支援批次</div>
+        <div class="opts">
+          <span class="ck on"><i></i>逐字稿</span>
+          <span class="ck on"><i></i>講者辨識</span>
+          <span class="ck on"><i></i>AI 摘要</span>
+          <span class="ck"><i></i>字幕檔 SRT/VTT</span>
+          <span class="ck"><i></i>翻譯(英→中)</span>
+          <span class="ck"><i></i>完成後轉發 NotebookLM</span>
+        </div>
+        <div class="q"><span class="fn">podcast_ep13.mp3</span><div class="bar"><i style="width:72%"></i></div><span class="pct">72%</span><span style="color:var(--tx3)">轉錄中</span></div>
+        <div class="q"><span class="fn">interview_0711.m4a</span><div class="bar"><i style="width:100%;background:var(--ok)"></i></div><span class="pct">完成</span><span style="color:var(--ok)">✓ 4 檔輸出</span></div>
+        <div class="q"><span class="fn">lecture_part2.wav</span><div class="bar"><i style="width:0%"></i></div><span class="pct">佇列中</span><span style="color:var(--tx3)">—</span></div>
+        <div class="opts" style="border-top:1px solid var(--line)"><span style="color:var(--tx3)">處理引擎:</span><span class="ck on"><i></i>本機 GPU</span><span class="ck"><i></i>遠端 GPU 伺服器(192.168.1.50)</span></div>
+      </div>
+      <div class="note"><b>a.</b>輸出選項為每批次可調;勾「完成後轉發 NotebookLM」即無人值守歸檔(走 notebooklm-py 或留待開瀏覽器時由擴充補送)。</div>
+      <div class="note"><b>b.</b>底部可切換本機/遠端 GPU 伺服器(沿用 jt-live-whisper 的 remote server 架構)。</div>
+    </div>
+  </div>
+
+  <!-- ============ 4 Chrome 擴充 ============ -->
+  <h2><span class="no">04</span>Chrome 擴充 — 側欄 + 頁面字幕<span class="chip">Manifest V3 · Side Panel</span></h2>
+  <p class="lead">左側是使用者正在看的分頁(會議/影片),擴充以 tabCapture 把分頁音訊送本地引擎;字幕同時出現在「頁面疊加字幕條」與「側欄字幕流」。引擎不在線時降級 Web Speech API 並明確標示。</p>
+  <div class="frame">
+    <div class="tbar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="t">Chrome — meet.google.com<span style="float:right"></span></span></div>
+    <div class="browser">
+      <div class="page">
+        <div class="video">Google Meet / YouTube / Podcast 分頁
+          <div class="vsub"><div class="a">We need to finalize the Q3 roadmap…</div><div class="b">我們需要確定第三季的產品路線圖…</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><i></i><b>翻譯蒟蒻</b><span class="stat"><span class="pulse"></span>引擎已連線 · 0.7s</span></div>
+        <div class="pctl">
+          <span class="pbtn on">● 擷取此分頁</span>
+          <span class="pbtn">英→繁中</span>
+          <span class="pbtn">頁面字幕</span>
+        </div>
+        <div class="pcaps">
+          <div class="pcap"><div class="o"><span class="spk s1" style="font-size:9.5px">Speaker 1</span> We need to finalize the Q3 roadmap before the end of this sprint.</div><div class="z">我們需要在這個 sprint 結束前確定第三季的產品路線圖。</div></div>
+          <div class="pcap"><div class="o"><span class="spk s2" style="font-size:9.5px">Speaker 2</span> The speaker diarization module still needs another round of testing.</div><div class="z">講者辨識模組還需要再進行一輪測試。</div></div>
+          <div class="pcap" style="border-color:var(--brand-deep)"><div class="o"><span class="spk s2" style="font-size:9.5px">Speaker 2</span> I can share the test results by Friday…</div><div class="z">我可以在週五前分享測試結果…▌</div></div>
+        </div>
+        <div class="pfoot">
+          <span class="btn" style="text-align:center">✨ 即時摘要</span>
+          <span class="nblm">📤 傳送到 NotebookLM</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>a.</b>側欄頂:引擎連線狀態 + 延遲。離線時顯示「⚠ 使用瀏覽器內建辨識(品質較低)」黃色橫幅,一鍵引導啟動桌面 App。</div>
+  <div class="note"><b>b.</b>「擷取此分頁」需使用者主動點擊(MV3 權限);「頁面字幕」開關控制疊加字幕條(content script)。</div>
+  <div class="note"><b>c.</b>「即時摘要」對目前累積字幕請求引擎摘要,結果直接顯示在側欄,適合會議中途插入時快速跟上。</div>
+
+  <!-- ============ 5 NotebookLM 轉發 ============ -->
+  <h2><span class="no">05</span>NotebookLM 轉發對話框<span class="chip">桌面與擴充共用</span></h2>
+  <p class="lead">桌面 App 與 Chrome 擴充按下「轉發」後的統一流程。內容一律是「摘要在前、含講者時戳逐字稿在後」的 Markdown;傳送方式依環境自動選擇(擴充自動化 / notebooklm-py / Enterprise API / 手動貼上引導)。</p>
+  <div class="frame">
+    <div class="modalstage">
+      <div class="modal">
+        <h3>📤 轉發到 NotebookLM</h3>
+        <div class="ms">產品開發會議 · 2026-07-13 · 52 分 · 3 位講者</div>
+        <div class="fld"><label>目標筆記本</label><div class="inp">📓 團隊會議紀錄 2026 Q3 <span style="color:var(--tx3)">▼</span></div></div>
+        <div class="fld"><label>來源方式</label>
+          <div class="radio"><span class="rd on">新增為新來源</span><span class="rd">附加到既有來源</span><span class="rd">新建筆記本</span></div>
+        </div>
+        <div class="fld"><label>內容範圍</label>
+          <div class="radio"><span class="rd on">摘要 + 完整逐字稿</span><span class="rd">僅摘要</span><span class="rd">僅重點標記段落</span></div>
+        </div>
+        <div class="fld"><label>內容預覽(Markdown)</label>
+          <div class="prev"># 產品開發會議 — 2026-07-13<br>## 摘要<br>- 確認 Q3 路線圖須於本 sprint 結束前定案(王經理)<br>- 講者辨識模組需再一輪測試…<br>## 逐字稿<br>[00:13:58] 王經理:我們需要在這個 sprint 結束前確定…</div>
+        </div>
+        <div class="macts"><span class="btn">取消</span><span class="btn pri">傳送(經 Chrome 擴充)</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>a.</b>主按鈕動態標示實際傳送路徑:「經 Chrome 擴充」/「經 API」;全部不可用時變成「開啟 NotebookLM 並複製內容」的手動降級。</div>
+  <div class="note"><b>b.</b>筆記本清單由擴充從 NotebookLM 頁面讀取快取;「附加到既有來源」用於把每週例會累積在同一來源。</div>
+  <div class="note"><b>c.</b>傳送成功後,session 在紀錄庫掛上「已轉發 NBLM」徽章並記錄目標筆記本,避免重複。</div>
+
+  <!-- ============ 6 核心使用流程 ============ -->
+  <h2><span class="no">06</span>核心使用流程(Happy Path)</h2>
+  <div class="flow">
+    <div class="fstep"><b>1 · 開始</b><span>Ctrl+Shift+R 或側欄「擷取此分頁」</span></div><span class="farrow">→</span>
+    <div class="fstep"><b>2 · 開會</b><span>懸浮/側欄雙語字幕,講者自動分色,隨手 ⭐ 標記重點</span></div><span class="farrow">→</span>
+    <div class="fstep"><b>3 · 結束</b><span>停止錄製 → 自動存入紀錄庫 → 一鍵產生摘要</span></div><span class="farrow">→</span>
+    <div class="fstep"><b>4 · 命名講者</b><span>Speaker 1 → 王經理,全文同步更新</span></div><span class="farrow">→</span>
+    <div class="fstep"><b>5 · 轉發</b><span>📤 NotebookLM,選筆記本送出,之後在 NotebookLM 溯源提問</span></div>
+  </div>
+
+  <h2><span class="no">07</span>設定頁資訊架構(摘要)</h2>
+  <p class="lead" style="margin-bottom:8px">設定分五組,首次啟動有精靈引導(偵測 GPU → 選模型大小 → 下載模型 → 測試音訊擷取):</p>
+  <div class="principles">
+    <div class="pr"><b>引擎</b><p>ASR 模型選擇與下載管理、GPU/CPU、遠端伺服器位址、Ollama 模型與連線測試。</p></div>
+    <div class="pr"><b>音訊</b><p>輸入裝置、系統音訊來源、雙向模式配置、macOS BlackHole 安裝引導。</p></div>
+    <div class="pr"><b>顯示</b><p>字級、懸浮字幕樣式、深/淺主題、原文顯示開關、講者顏色。</p></div>
+    <div class="pr"><b>整合</b><p>NotebookLM 路徑設定、Telegram/Slack/Discord webhook、Supabase 多人同步(選配)。</p></div>
+    <div class="pr"><b>隱私</b><p>音檔保留天數(預設 7 天自動清理)、紀錄庫位置、全部資料一鍵刪除。</p></div>
+  </div>
+</div>

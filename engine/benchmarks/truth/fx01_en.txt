@@ -1,0 +1,6 @@
+Welcome everyone to the quarterly product review meeting.
+Our main goal today is to finalize the roadmap for the next release.
+The speech recognition module has passed all of the integration tests.
+We still need another round of testing for the speaker identification feature.
+Customer feedback about the floating subtitle window has been very positive.
+Let us schedule a follow up meeting before the end of this sprint.

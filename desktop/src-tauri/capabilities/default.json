@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "主視窗與懸浮字幕視窗權限",
+  "windows": ["main", "overlay"],
+  "permissions": [
+    "core:default",
+    "global-shortcut:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-is-visible",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size"
+  ]
+}

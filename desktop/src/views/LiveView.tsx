@@ -1,0 +1,252 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../api";
+import CaptionCard from "../components/CaptionCard";
+import SpeakerPanel from "../components/SpeakerPanel";
+import type { Session, Speaker } from "../types";
+import { useCaptionStream } from "../ws";
+
+const MODES = [
+  ["en2zh", "英 → 繁中"],
+  ["zh2en", "中 → 英"],
+  ["ja2zh", "日 → 繁中"],
+  ["en", "英文轉錄"],
+  ["zh", "中文轉錄"],
+] as const;
+
+export default function LiveView({ engineOk }: { engineOk: boolean }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
+  const [mode, setMode] = useState<string>("en2zh");
+  const [topic, setTopic] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [kwHits, setKwHits] = useState<Map<string, number>>(new Map());
+
+  const recording = session?.status === "recording";
+  const { captions, connected, lastEvent } = useCaptionStream(session?.id ?? null);
+  const streamRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!recording) return;
+    const t0 = Date.now();
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [recording]);
+
+  useEffect(() => {
+    if (!lastEvent || !session) return;
+    if (lastEvent.type === "speaker" || lastEvent.type === "caption") {
+      api.getSession(session.id).then((d) => setSpeakers(d.speakers)).catch(() => {});
+    }
+    if (lastEvent.type === "summary") setSummary(String(lastEvent.data.content_md ?? ""));
+    if (lastEvent.type === "keyword") {
+      const kw = String(lastEvent.data.keyword);
+      setKwHits((prev) => new Map(prev).set(kw, (prev.get(kw) ?? 0) + 1));
+    }
+    if (lastEvent.type === "status" && lastEvent.data.status === "done") {
+      setSession((s) => (s ? { ...s, status: "done" } : s));
+    }
+  }, [lastEvent, session?.id]);
+
+  useEffect(() => {
+    streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight });
+  }, [captions.length]);
+
+  const speakerMap = useMemo(() => new Map(speakers.map((s) => [s.id, s])), [speakers]);
+
+  const start = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    setSummary(null);
+    try {
+      const s = await api.liveStart(
+        `即時會議 ${new Date().toLocaleString("zh-TW")}`,
+        mode,
+        topic.trim() || null,
+      );
+      setSession(s);
+      setElapsed(0);
+      setKwHits(new Map());
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [mode, topic]);
+
+  const stop = useCallback(async () => {
+    if (!session) return;
+    setBusy(true);
+    try {
+      setSession(await api.stop(session.id));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [session]);
+
+  // 全域快捷鍵 Ctrl+Shift+R(Rust 端 emit;非 Tauri 環境略過)
+  const toggleRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    toggleRef.current = () => (recording ? stop() : start());
+  });
+  useEffect(() => {
+    let un: (() => void) | undefined;
+    import("@tauri-apps/api/event")
+      .then(({ listen }) => listen("konjac://toggle-record", () => toggleRef.current()))
+      .then((u) => (un = u))
+      .catch(() => {});
+    return () => un?.();
+  }, []);
+
+  const toggleOverlay = useCallback(async () => {
+    try {
+      const { Window } = await import("@tauri-apps/api/window");
+      const w = await Window.getByLabel("overlay");
+      if (!w) return;
+      (await w.isVisible()) ? await w.hide() : await w.show();
+    } catch {
+      setError("懸浮字幕僅桌面 App 環境可用");
+    }
+  }, []);
+
+  const hhmmss = (s: number) =>
+    [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60]
+      .map((n) => String(n).padStart(2, "0"))
+      .join(":");
+
+  return (
+    <div className="grid h-full grid-cols-[1fr_230px]">
+      <div className="flex min-w-0 flex-col">
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-line px-4 py-3">
+          <select
+            value={mode}
+            disabled={recording}
+            onChange={(e) => setMode(e.target.value)}
+            className="rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12.5px]"
+          >
+            {MODES.map(([v, label]) => (
+              <option key={v} value={v}>{label}</option>
+            ))}
+          </select>
+          <input
+            value={topic}
+            disabled={recording}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="會議主題(提升術語翻譯)"
+            className="w-56 rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12.5px] placeholder:text-tx3"
+          />
+          {recording && <span className="font-mono text-[13px] text-tx2">{hhmmss(elapsed)}</span>}
+          <button
+            onClick={recording ? stop : start}
+            disabled={busy || !engineOk}
+            className={`ml-auto rounded-lg px-5 py-2 text-[13.5px] font-bold disabled:opacity-40 ${
+              recording
+                ? "bg-gradient-to-br from-brand to-brand-deep text-[#1c0d12]"
+                : "border border-brand-deep bg-brand/15 text-brand"
+            }`}
+          >
+            {recording ? "■ 停止錄製" : "● 開始錄製"}
+          </button>
+        </div>
+
+        {error && (
+          <div className="border-b border-line bg-brand-deep/20 px-4 py-2 text-[12px] text-brand">
+            {error}
+          </div>
+        )}
+
+        <div ref={streamRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+          {captions.length === 0 && (
+            <div className="m-auto text-center text-[13px] text-tx3">
+              {recording
+                ? connected
+                  ? "等待第一句字幕…"
+                  : "連線字幕流中…"
+                : "按「開始錄製」擷取系統音訊並即時轉錄翻譯(Ctrl+Shift+R)"}
+            </div>
+          )}
+          {captions.map((c, i) => (
+            <CaptionCard
+              key={c.seq}
+              cap={c}
+              speakers={speakerMap}
+              live={recording && i === captions.length - 1}
+              onStar={(seq) => session && api.star(session.id, seq).catch(() => {})}
+            />
+          ))}
+          {summary && (
+            <div className="whitespace-pre-wrap rounded-xl border border-line border-l-4 border-l-brand bg-panel px-4 py-3 text-[13px] text-tx2">
+              {summary}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2.5 border-t border-line px-4 py-3">
+          <button
+            disabled={!session || captions.length === 0}
+            onClick={() => session && api.summarize(session.id).catch((e) => setError(String(e)))}
+            className="rounded-lg border border-line bg-panel2 px-4 py-2 text-[12.5px] disabled:opacity-40"
+          >
+            ✨ 產生摘要
+          </button>
+          <button
+            onClick={toggleOverlay}
+            className="rounded-lg border border-line bg-panel2 px-4 py-2 text-[12.5px]"
+          >
+            🪟 懸浮字幕
+          </button>
+          {session && (
+            <a
+              href={api.exportUrl(session.id, "md")}
+              target="_blank"
+              className="rounded-lg border border-line bg-panel2 px-4 py-2 text-[12.5px]"
+            >
+              ⬇ 匯出 MD
+            </a>
+          )}
+          <div className="flex-1" />
+          <button
+            disabled={!session || captions.length === 0}
+            onClick={() =>
+              session &&
+              api.forwardNotebookLM(session.id, "預設筆記本", "full").catch((e) => setError(String(e)))
+            }
+            className="rounded-lg border border-brand-deep bg-brand/15 px-4 py-2 text-[12.5px] font-semibold text-brand disabled:opacity-40"
+          >
+            📤 轉發 NotebookLM
+          </button>
+        </div>
+      </div>
+
+      <aside className="border-l border-line bg-[#141720] p-3.5">
+        <SpeakerPanel
+          speakers={speakers}
+          onRename={(id, name) =>
+            session && api.renameSpeaker(session.id, id, name).then(setSpeakers).catch(() => {})
+          }
+        />
+        {kwHits.size > 0 && (
+          <>
+            <h4 className="mb-2 mt-5 text-[11px] uppercase tracking-wider text-tx3">
+              關鍵字命中
+            </h4>
+            <div className="flex flex-wrap gap-1.5">
+              {[...kwHits.entries()].map(([kw, n]) => (
+                <span
+                  key={kw}
+                  className="rounded-full border border-[#ffc46b] px-2.5 py-0.5 text-[11.5px] text-[#ffc46b]"
+                >
+                  {kw} ⚡{n}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+      </aside>
+    </div>
+  );
+}

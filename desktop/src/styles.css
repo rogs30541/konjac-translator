@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-tx;
+  font-family: "Segoe UI", "Noto Sans TC", sans-serif;
+}
+
+/* streaming 游標 */
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+.caret {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  background: #ff8fa3;
+  vertical-align: -2px;
+  margin-left: 3px;
+  animation: blink 1s infinite;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2e3342;
+  border-radius: 99px;
+}

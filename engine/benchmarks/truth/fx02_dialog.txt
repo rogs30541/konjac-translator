@@ -1,0 +1,8 @@
+A|Good morning, shall we start with the engineering update?
+B|Sure, the transcription engine is now running on the new graphics card.
+A|That is great news, how about the translation quality?
+B|The cloud correction step has improved the accuracy quite a bit.
+A|Do we have any remaining blockers for the beta release?
+B|Only the installer packaging, everything else is ready to go.
+A|Perfect, then let us aim for a beta launch next week.
+B|Agreed, I will prepare the release notes by Friday.

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+engine/dist/
+engine/build/
+*.spec
+
+# Node / Tauri
+node_modules/
+dist/
+target/
+desktop/src-tauri/gen/
+desktop/src-tauri/binaries/*.exe
+
+# 上游 clone(依 engine/README 重新 clone;不納入本 repo)
+vendor/
+
+# 產生物與紀錄
+logs/
+*.log
+.cache/
+engine/tests/fixtures/*.wav
+engine/benchmarks/audio/
+
+# 本機資料
+.konjac/
+
+.claude/
