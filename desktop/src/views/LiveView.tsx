@@ -37,11 +37,29 @@ export default function LiveView({
   const streamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!recording) return;
-    const t0 = Date.now();
-    const t = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
+    if (!recording || !session) return;
+    // 以 session 建立時間為基準:視窗重開接回時顯示真實錄製時長
+    const t0 = new Date(session.created_at).getTime();
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - t0) / 1000)));
+    tick();
+    const t = setInterval(tick, 1000);
     return () => clearInterval(t);
-  }, [recording]);
+  }, [recording, session?.id]);
+
+  // 視窗重開(系統匣模式)自動接回引擎上進行中的錄製,避免狀態失聯與 409
+  useEffect(() => {
+    if (!engineOk || session) return;
+    api
+      .listSessions()
+      .then((all) => {
+        const rec = all.find((s) => s.kind === "live" && s.status === "recording");
+        if (rec) {
+          setSession(rec);
+          api.getSession(rec.id).then((d) => setSpeakers(d.speakers)).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, [engineOk, session]);
 
   useEffect(() => {
     if (!lastEvent || !session) return;
