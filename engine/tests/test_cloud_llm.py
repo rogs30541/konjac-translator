@@ -28,6 +28,13 @@ class FakeLLM:
             return None
         return f"[譯]{text}"
 
+    async def list_models(self):
+        if self.s.provider == "gemini":
+            return ["gemini-2.5-pro", "gemini-2.5-flash",
+                    "gemini-2.5-flash-lite", "gemini-2.5-flash-preview-tts"]
+        raise RuntimeError(
+            f"boom url?key={self.s.api_key} leaked")  # 測 Key 遮罩
+
     async def summarize(self, transcript_md, topic, template="general"):
         return (f"## 摘要\n- [雲端摘要][{template}] "
                 f"共 {len(transcript_md.splitlines())} 行")
@@ -141,6 +148,43 @@ def test_cloud_summary_when_configured(client):
     # 模板參數傳遞
     r = client.post(f"/api/sessions/{sid}/summary?template=interview")
     assert "[interview]" in r.json()["content_md"]
+
+
+def test_list_models_and_recommend(client):
+    # 未設定 → 400
+    assert client.get("/api/settings/models").status_code == 400
+    client.put("/api/settings", json={"provider": "gemini",
+                                      "api_key": "sk-test-1234567890abcd"})
+    r = client.get("/api/settings/models")
+    assert r.status_code == 200
+    body = r.json()
+    assert "gemini-2.5-flash-lite" in body["models"]
+    # CP 推薦:flash-lite 優先於 flash/pro;tts/preview 變體被降權
+    assert body["recommended"] == "gemini-2.5-flash-lite"
+
+
+def test_list_models_error_masks_key(client):
+    client.put("/api/settings", json={"provider": "openai",
+                                      "api_key": "sk-secret-9876543210xyz"})
+    r = client.get("/api/settings/models")  # FakeLLM 對非 gemini 丟含 Key 例外
+    assert r.status_code == 502
+    assert "sk-secret-9876543210xyz" not in r.text
+    assert "***KEY***" in r.text
+
+
+def test_recommend_model_heuristics():
+    from app.providers.cloud_llm import recommend_model
+    assert recommend_model("anthropic", [
+        "claude-opus-4-1", "claude-sonnet-4-5", "claude-haiku-4-5",
+    ]) == "claude-haiku-4-5"
+    assert recommend_model("openai", [
+        "gpt-4o", "gpt-4o-mini", "gpt-4o-audio-preview", "o3-pro",
+    ]) == "gpt-4o-mini"
+    assert recommend_model("gemini", []) is None
+    # 版本較新者優先(同為 flash)
+    assert recommend_model("gemini", [
+        "gemini-1.5-flash", "gemini-2.5-flash",
+    ]) == "gemini-2.5-flash"
 
 
 def test_mock_summary_when_not_configured(client):

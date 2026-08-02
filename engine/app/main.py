@@ -27,10 +27,12 @@ from .models import (
 )
 from .providers.cloud_llm import (
     CloudLLM, CloudSummarizer, LLMSettings, SettingsStore, needs_translation,
+    recommend_model,
 )
 from .providers.forwarder import send_caption
 from .providers.jt_bridge import (
-    JtBridgeConfig, JtLiveBridge, JtOfflineBridge, VENDOR_SCRIPT,
+    JtBridgeConfig, JtLiveBridge, JtOfflineBridge, set_vendor_override,
+    vendor_available, vendor_dir,
 )
 from .providers.mock import MockOfflinePipeline, MockSummarizer
 
@@ -67,13 +69,17 @@ def create_app(store: Optional[Store] = None,
         allow_methods=["*"], allow_headers=["*"])
     app.state.store = store or Store()
     app.state.hub = Hub()
-    # 離線管線預設:vendor 可用就走真實 JtOfflineBridge(demo 模式維持 mock)
-    if offline_pipeline is not None:
-        app.state.offline = offline_pipeline
-    elif os.environ.get("KONJAC_DEMO") != "1" and VENDOR_SCRIPT.is_file():
-        app.state.offline = JtOfflineBridge(JtBridgeConfig())
-    else:
-        app.state.offline = MockOfflinePipeline()
+    # 離線管線:call-time 動態選擇(設定頁改 vendor 路徑即時生效)
+    app.state.offline_injected = offline_pipeline
+
+    def get_offline():
+        if app.state.offline_injected is not None:
+            return app.state.offline_injected
+        if os.environ.get("KONJAC_DEMO") == "1" or not vendor_available():
+            return MockOfflinePipeline()
+        return JtOfflineBridge(JtBridgeConfig())
+
+    app.state.get_offline = get_offline
     app.state.summarizer = summarizer or MockSummarizer()
     app.state.offline_jobs: dict[str, dict] = {}
     app.state.live = LiveManager()
@@ -87,6 +93,7 @@ def create_app(store: Optional[Store] = None,
 
     app.state.get_llm = get_llm
     app.state.app_settings = app.state.settings_store.load_app()
+    set_vendor_override(app.state.app_settings.get("vendor_dir") or None)
     app.state.webhook_client = webhook_client  # 測試注入;None = 每次自建
 
     async def after_caption(sid: str, cap):
@@ -110,13 +117,16 @@ def create_app(store: Optional[Store] = None,
     # 啟動時執行保留天數清理(retention_days=0 表示不清理)
     app.state.store.delete_older_than(
         int(app.state.app_settings.get("retention_days") or 0))
-    if bridge_factory is not None:
-        app.state.bridge_factory = bridge_factory
-    elif os.environ.get("KONJAC_DEMO") == "1":
-        app.state.bridge_factory = demo_bridge_factory
-    else:
-        app.state.bridge_factory = (
-            default_bridge_factory if VENDOR_SCRIPT.is_file() else None)
+    app.state.bridge_factory_injected = bridge_factory
+
+    def get_bridge_factory():
+        if app.state.bridge_factory_injected is not None:
+            return app.state.bridge_factory_injected
+        if os.environ.get("KONJAC_DEMO") == "1":
+            return demo_bridge_factory
+        return default_bridge_factory if vendor_available() else None
+
+    app.state.get_bridge_factory = get_bridge_factory
 
     st: Store = app.state.store
     hub: Hub = app.state.hub
@@ -132,8 +142,9 @@ def create_app(store: Optional[Store] = None,
     async def health():
         s: LLMSettings = app.state.llm_settings
         return {"status": "ok", "version": ENGINE_VERSION,
-                "provider": type(app.state.offline).__name__,
-                "vendor_available": VENDOR_SCRIPT.is_file(),
+                "provider": type(app.state.get_offline()).__name__,
+                "vendor_available": vendor_available(),
+                "vendor_dir": str(vendor_dir()),
                 "llm": s.provider if s.configured else None}
 
     # ---------- settings(API Key 只存本機)----------
@@ -158,7 +169,12 @@ def create_app(store: Optional[Store] = None,
 
     @app.get("/api/settings/app")
     async def get_app_settings():
-        return app.state.app_settings
+        return _app_settings_view()
+
+    def _app_settings_view() -> dict:
+        return {**app.state.app_settings,
+                "vendor_available": vendor_available(),
+                "vendor_resolved": str(vendor_dir())}
 
     @app.put("/api/settings/app")
     async def put_app_settings(body: dict):
@@ -171,15 +187,23 @@ def create_app(store: Optional[Store] = None,
                                    if isinstance(h, dict)]
         if "retention_days" in body:
             cleaned["retention_days"] = max(0, int(body["retention_days"] or 0))
+        if "vendor_dir" in body:
+            cleaned["vendor_dir"] = str(body["vendor_dir"] or "").strip()
         app.state.app_settings = app.state.settings_store.save_app(
             {**app.state.app_settings, **cleaned})
-        return app.state.app_settings
+        set_vendor_override(app.state.app_settings.get("vendor_dir") or None)
+        return _app_settings_view()
 
     @app.post("/api/maintenance/cleanup")
     async def cleanup():
         days = int(app.state.app_settings.get("retention_days") or 0)
         deleted = st.delete_older_than(days)
         return {"retention_days": days, "deleted_sessions": deleted}
+
+    def _mask_key(text: str) -> str:
+        """任何要回給前端的錯誤訊息,先把 API Key 遮掉(防日誌/畫面洩漏)。"""
+        key = app.state.llm_settings.api_key
+        return text.replace(key, "***KEY***") if key else text
 
     @app.post("/api/settings/test")
     async def test_settings():
@@ -190,7 +214,21 @@ def create_app(store: Optional[Store] = None,
             out = await llm.translate("Hello, this is a connectivity test.", "en2zh")
             return {"ok": True, "sample": out}
         except Exception as e:
-            raise HTTPException(502, f"llm test failed: {e}")
+            raise HTTPException(502, _mask_key(f"llm test failed: {e}"))
+
+    @app.get("/api/settings/models")
+    async def list_models():
+        """列出此 Key 可用的模型,並依 CP 值啟發式給出推薦。"""
+        llm = app.state.get_llm()
+        if llm is None:
+            raise HTTPException(400, "llm not configured")
+        try:
+            models = await llm.list_models()
+        except Exception as e:
+            raise HTTPException(502, _mask_key(f"list models failed: {e}"))
+        return {"models": sorted(models),
+                "recommended": recommend_model(
+                    app.state.llm_settings.provider, models)}
 
     # ---------- sessions ----------
     @app.post("/api/sessions", status_code=201)
@@ -219,15 +257,20 @@ def create_app(store: Optional[Store] = None,
     # ---------- live(jt-live-whisper 橋接)----------
     @app.post("/api/live/start", status_code=201)
     async def live_start(req: SessionCreate):
-        if app.state.bridge_factory is None:
-            raise HTTPException(503, "live provider unavailable (vendor script missing)")
+        factory = app.state.get_bridge_factory()
+        if factory is None:
+            raise HTTPException(
+                503,
+                "AI 管線(jt-live-whisper)未找到:請在「設定 → AI 管線位置」"
+                "指定安裝資料夾,或安裝至 C:\\jt-live-whisper。"
+                f"目前解析路徑:{vendor_dir()}")
         active = app.state.live.active()
         if active:
             raise HTTPException(409, f"another live session is recording: {active}")
         session = st.create_session(req)
         try:
             await app.state.live.start(
-                st, hub, session.id, req.mode, app.state.bridge_factory,
+                st, hub, session.id, req.mode, factory,
                 topic=req.topic, llm_getter=app.state.get_llm,
                 upstream_mode=UPSTREAM_ASR_MODE.get(req.mode),
                 on_caption=app.state.after_caption)
@@ -334,7 +377,7 @@ def create_app(store: Optional[Store] = None,
             tmp = Path(tempfile.gettempdir()) / f"konjac_{job_id}{suffix}"
             try:
                 tmp.write_bytes(data)
-                caps = await app.state.offline.transcribe_file(
+                caps = await app.state.get_offline().transcribe_file(
                     str(tmp), mode=UPSTREAM_ASR_MODE.get(mode, mode),
                     diarize=diarize)
                 for c in caps:

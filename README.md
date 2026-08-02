@@ -30,6 +30,15 @@ Chrome 擴充(MV3):側欄字幕鏡像、分頁錄音轉錄、NotebookLM 轉發
 | 翻譯蒟蒻-UI規劃書.html | 設計原則與全介面視覺稿 |
 | 翻譯蒟蒻-測試規劃書.md | 雙軌測試策略(軟體測試 + AI 評測基準線) |
 
+## 下載(Windows)
+
+👉 **[最新版安裝檔(Releases)](https://github.com/rogs30541/konjac-translator/releases/latest)** —
+`konjac-setup-x64.exe`,內含桌面 App + 本地引擎。
+
+安裝後兩步設定:
+1. 設定 → AI 管線位置:指向 jt-live-whisper 安裝資料夾(或安裝到 `C:\jt-live-whisper` 自動偵測)
+2. 設定 → 翻譯與摘要 AI:選供應商貼上 API Key,儲存後自動偵測可用模型並套用 CP 值推薦
+
 ## 快速開始(開發)
 
 ```powershell

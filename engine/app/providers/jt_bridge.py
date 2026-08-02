@@ -31,11 +31,24 @@ async def _auto_confirm(proc: asyncio.subprocess.Process) -> None:
         except (ConnectionResetError, BrokenPipeError):
             pass  # 子程序未讀 stdin(fake/已退出)是正常情況
 
-def _resolve_vendor_dir() -> Path:
-    """jt-live-whisper 位置,三段解析:
-    1. KONJAC_VENDOR_DIR 環境變數(打包版設定)
-    2. repo 相對路徑(開發模式)
-    3. C:\\jt-live-whisper(上游 install.ps1 一鍵安裝的預設位置)"""
+# 設定頁指定的路徑(app 啟動與存檔時呼叫 set_vendor_override)
+_vendor_override: Optional[Path] = None
+
+
+def set_vendor_override(path: str | None) -> None:
+    global _vendor_override
+    _vendor_override = Path(path) if path else None
+
+
+def vendor_dir() -> Path:
+    """jt-live-whisper 位置,call-time 四段解析(設定可即時生效):
+    1. 設定頁指定的路徑(settings.json 的 vendor_dir)
+    2. KONJAC_VENDOR_DIR 環境變數
+    3. repo 相對路徑(開發模式)
+    4. C:\\jt-live-whisper(上游 install.ps1 一鍵安裝的預設位置)"""
+    if (_vendor_override
+            and (_vendor_override / "translate_meeting.py").is_file()):
+        return _vendor_override
     env = os.environ.get("KONJAC_VENDOR_DIR")
     if env and (Path(env) / "translate_meeting.py").is_file():
         return Path(env)
@@ -45,19 +58,23 @@ def _resolve_vendor_dir() -> Path:
     return Path(r"C:\jt-live-whisper")
 
 
-VENDOR_DIR = _resolve_vendor_dir()
-VENDOR_SCRIPT = VENDOR_DIR / "translate_meeting.py"
-VENDOR_PYTHON = VENDOR_DIR / "venv" / "Scripts" / "python.exe"
+def vendor_script() -> Path:
+    return vendor_dir() / "translate_meeting.py"
+
+
+def vendor_available() -> bool:
+    return vendor_script().is_file()
 
 
 def _default_python() -> str:
     # 上游依賴(faster-whisper/torch 等)裝在 vendor venv,存在就優先用
-    return str(VENDOR_PYTHON) if VENDOR_PYTHON.is_file() else sys.executable
+    py = vendor_dir() / "venv" / "Scripts" / "python.exe"
+    return str(py) if py.is_file() else sys.executable
 
 
 @dataclass
 class JtBridgeConfig:
-    script: Path = VENDOR_SCRIPT
+    script: Path = field(default_factory=vendor_script)
     python_exe: str = field(default_factory=_default_python)
     port: int = 19780          # 上游寫死的埠;測試傳 0 取臨時埠
     extra_args: list[str] = field(default_factory=list)

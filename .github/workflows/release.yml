@@ -1,0 +1,71 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build engine exe (PyInstaller)
+        shell: pwsh
+        run: |
+          cd engine
+          python -m venv .venv
+          .venv\Scripts\pip install -r requirements.txt pyinstaller
+          .venv\Scripts\pyinstaller --onefile --name konjac-engine `
+            --collect-submodules uvicorn --collect-submodules websockets `
+            --hidden-import app.main serve.py --noconfirm
+          New-Item -ItemType Directory -Force ..\desktop\src-tauri\binaries | Out-Null
+          Copy-Item dist\konjac-engine.exe `
+            ..\desktop\src-tauri\binaries\konjac-engine-x86_64-pc-windows-msvc.exe -Force
+
+      - name: Run engine tests
+        shell: pwsh
+        run: |
+          cd engine
+          .venv\Scripts\python -m pytest tests -q
+
+      - name: Build Tauri app + NSIS installer
+        shell: pwsh
+        run: |
+          cd desktop
+          npm ci
+          npm run tauri build
+
+      - name: Stage installer with ASCII name
+        shell: pwsh
+        run: |
+          $src = Get-ChildItem "desktop\src-tauri\target\release\bundle\nsis\*-setup.exe" | Select-Object -First 1
+          Copy-Item $src.FullName "konjac-setup-x64.exe" -Force
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: konjac-setup-x64.exe
+          generate_release_notes: true
+
+      - name: Upload artifact (non-tag runs)
+        uses: actions/upload-artifact@v4
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        with:
+          name: konjac-setup-x64
+          path: konjac-setup-x64.exe

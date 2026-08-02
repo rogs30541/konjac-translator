@@ -14,9 +14,37 @@ import httpx
 
 DEFAULT_MODELS = {
     "openai": "gpt-4o-mini",
-    "gemini": "gemini-2.0-flash",
+    "gemini": "gemini-2.5-flash",
     "anthropic": "claude-haiku-4-5",
 }
+
+# CP 值推薦啟發式:每家由高 CP → 高階排序的名稱片段
+_CP_PREFERENCE = {
+    "gemini": ["flash-lite", "flash", "pro"],
+    "openai": ["nano", "mini", "4o", "gpt-4.1", "gpt-5"],
+    "anthropic": ["haiku", "sonnet", "opus"],
+}
+
+
+def recommend_model(provider: str, models: list[str]) -> Optional[str]:
+    """從可用模型挑 CP 值最高者:偏好片段優先、版本號新者優先、
+    preview/exp 降權、名稱短者優先(避開 -preview-0409 這類變體)。"""
+    import re as _re
+    if not models:
+        return None
+    prefs = _CP_PREFERENCE.get(provider, [])
+
+    def score(m: str):
+        ml = m.lower()
+        tier = next((i for i, tag in enumerate(prefs) if tag in ml), len(prefs) + 1)
+        ver_m = _re.search(r"(\d+(?:\.\d+)?)", ml)
+        ver = float(ver_m.group(1)) if ver_m else 0.0
+        unstable = 1 if any(t in ml for t in ("preview", "exp", "beta", "tts",
+                                              "embed", "audio", "image",
+                                              "realtime", "live")) else 0
+        return (unstable, tier, -ver, len(ml))
+
+    return sorted(models, key=score)[0]
 
 SUMMARY_TEMPLATES = {
     "general":   "## 摘要\n- 重點條列(3-8 條)\n### 決議事項\n### 待辦事項(含負責講者)",
@@ -54,7 +82,8 @@ class LLMSettings:
         return d
 
 
-APP_DEFAULTS = {"keywords": [], "webhooks": [], "retention_days": 0}
+APP_DEFAULTS = {"keywords": [], "webhooks": [], "retention_days": 0,
+                "vendor_dir": ""}
 
 
 class SettingsStore:
@@ -123,9 +152,10 @@ class CloudLLM:
                 r.raise_for_status()
                 return "".join(b.get("text", "") for b in r.json()["content"])
             if p == "gemini":
+                # Key 走 header,不進 URL(避免錯誤訊息/日誌洩漏)
                 r = await client.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                    params={"key": self.s.api_key},
+                    headers={"x-goog-api-key": self.s.api_key},
                     json={"contents": [{"parts": [{"text": prompt}]}]})
                 r.raise_for_status()
                 cands = r.json().get("candidates", [])
@@ -140,6 +170,35 @@ class CloudLLM:
                       "messages": [{"role": "user", "content": prompt}]})
             r.raise_for_status()
             return r.json()["choices"][0]["message"]["content"]
+
+    async def list_models(self) -> list[str]:
+        """列出此 Key 可用且支援文字生成的模型。"""
+        p = self.s.provider
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            if p == "anthropic":
+                r = await client.get(
+                    "https://api.anthropic.com/v1/models",
+                    headers={"x-api-key": self.s.api_key,
+                             "anthropic-version": "2023-06-01"})
+                r.raise_for_status()
+                return [m["id"] for m in r.json().get("data", [])]
+            if p == "gemini":
+                r = await client.get(
+                    "https://generativelanguage.googleapis.com/v1beta/models",
+                    headers={"x-goog-api-key": self.s.api_key},
+                    params={"pageSize": "200"})
+                r.raise_for_status()
+                out = []
+                for m in r.json().get("models", []):
+                    if "generateContent" in m.get("supportedGenerationMethods", []):
+                        out.append(m.get("name", "").removeprefix("models/"))
+                return [m for m in out if m]
+            base = (self.s.base_url or "https://api.openai.com").rstrip("/")
+            r = await client.get(
+                f"{base}/v1/models",
+                headers={"Authorization": f"Bearer {self.s.api_key}"})
+            r.raise_for_status()
+            return [m["id"] for m in r.json().get("data", [])]
 
     async def translate(self, text: str, mode: str,
                         topic: Optional[str] = None) -> Optional[str]:

@@ -39,7 +39,9 @@ def _mk_session(client):
 def test_app_settings_crud_and_persist(env, tmp_path):
     client, _ = env
     s = client.get("/api/settings/app").json()
-    assert s == {"keywords": [], "webhooks": [], "retention_days": 0}
+    assert s["keywords"] == [] and s["webhooks"] == []
+    assert s["retention_days"] == 0 and s["vendor_dir"] == ""
+    assert "vendor_available" in s and "vendor_resolved" in s
 
     r = client.put("/api/settings/app", json={
         "keywords": ["roadmap", " deadline ", ""],
@@ -134,3 +136,29 @@ def test_retention_cleanup(env):
     # retention_days=0 = 不清理
     client.put("/api/settings/app", json={"retention_days": 0})
     assert client.post("/api/maintenance/cleanup").json()["deleted_sessions"] == 0
+
+
+def test_vendor_dir_setting(env, tmp_path):
+    """設定頁指定 AI 管線位置 → 即時生效(不需重啟引擎)。"""
+    from app.providers.jt_bridge import set_vendor_override
+    client, _ = env
+    try:
+        fake_vendor = tmp_path / "my-jt"
+        fake_vendor.mkdir()
+        # 路徑存在但沒有 translate_meeting.py → 覆寫無效,退回自動解析
+        s = client.put("/api/settings/app",
+                       json={"vendor_dir": str(fake_vendor)}).json()
+        assert s["vendor_resolved"] != str(fake_vendor)
+        # 放入腳本 → 立即可用,解析路徑指向設定值
+        (fake_vendor / "translate_meeting.py").write_text("# stub")
+        s = client.get("/api/settings/app").json()
+        assert s["vendor_available"] is True
+        assert s["vendor_resolved"] == str(fake_vendor)
+        # health 同步反映
+        h = client.get("/api/health").json()
+        assert h["vendor_available"] is True
+        # 清空設定 → 回到自動解析
+        s = client.put("/api/settings/app", json={"vendor_dir": ""}).json()
+        assert s["vendor_resolved"] != str(fake_vendor)
+    finally:
+        set_vendor_override(None)  # 不汙染其他測試(模組層全域)

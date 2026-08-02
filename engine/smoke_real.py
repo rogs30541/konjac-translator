@@ -13,13 +13,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.db import Store
 from app.main import create_app
-from app.providers.jt_bridge import JtBridgeConfig, JtOfflineBridge, VENDOR_PYTHON
+from app.providers.jt_bridge import JtBridgeConfig, JtOfflineBridge, vendor_dir
 
 WAV = Path(__file__).parent / "tests" / "fixtures" / "smoke_en.wav"
 
 def main() -> int:
     assert WAV.is_file(), f"missing fixture: {WAV}"
-    assert VENDOR_PYTHON.is_file(), f"vendor venv missing: {VENDOR_PYTHON}"
+    vendor_py = vendor_dir() / "venv" / "Scripts" / "python.exe"
+    assert vendor_py.is_file(), f"vendor venv missing: {vendor_py}"
 
     # 真實上游寫死連 19780,不能用臨時埠
     offline = JtOfflineBridge(JtBridgeConfig(port=19780), timeout=600.0)

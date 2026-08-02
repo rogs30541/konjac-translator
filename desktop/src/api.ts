@@ -24,6 +24,9 @@ export interface AppSettings {
   keywords: string[];
   webhooks: Array<Partial<Record<string, string>> & { type: string }>;
   retention_days: number;
+  vendor_dir: string;
+  vendor_available: boolean;
+  vendor_resolved: string;
 }
 
 export const api = {
@@ -38,6 +41,8 @@ export const api = {
     req<LLMSettings>("/api/settings", { method: "PUT", body: JSON.stringify(body) }),
   testSettings: () =>
     req<{ ok: boolean; sample: string }>("/api/settings/test", { method: "POST" }),
+  listModels: () =>
+    req<{ models: string[]; recommended: string | null }>("/api/settings/models"),
   listSessions: () => req<Session[]>("/api/sessions"),
   getSession: (id: string) =>
     req<{ session: Session; speakers: Speaker[]; summary: { content_md: string } | null }>(
