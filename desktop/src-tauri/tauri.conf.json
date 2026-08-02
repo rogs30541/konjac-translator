@@ -1,6 +1,6 @@
-﻿{
+{
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "蝧餉陌?",
+  "productName": "翻譯蒟蒻",
   "version": "0.1.2",
   "identifier": "tw.konjac.desktop",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "蝧餉陌?",
+        "title": "翻譯蒟蒻",
         "width": 1100,
         "height": 720,
         "minWidth": 900,
@@ -21,7 +21,7 @@
       },
       {
         "label": "overlay",
-        "title": "蝧餉陌? ???豢筑摮?",
+        "title": "翻譯蒟蒻 — 懸浮字幕",
         "width": 900,
         "height": 130,
         "x": 200,
