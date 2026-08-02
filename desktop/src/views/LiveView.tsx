@@ -31,6 +31,21 @@ export default function LiveView({
   const [summary, setSummary] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [kwHits, setKwHits] = useState<Map<string, number>>(new Map());
+  const [diag, setDiag] = useState<string | null>(null);
+  const [diagBusy, setDiagBusy] = useState(false);
+
+  const runDiag = async () => {
+    setDiagBusy(true);
+    setDiag("診斷中…請保持影片/音訊播放(約 6 秒)");
+    try {
+      const r = await api.audioDiag();
+      setDiag(r.advice);
+    } catch (e) {
+      setDiag(`診斷失敗:${String(e)}`);
+    } finally {
+      setDiagBusy(false);
+    }
+  };
 
   const recording = session?.status === "recording";
   const { captions, connected, lastEvent } = useCaptionStream(session?.id ?? null);
@@ -195,6 +210,12 @@ export default function LiveView({
             {error}
           </div>
         )}
+        {diag && (
+          <div className="flex items-start gap-2 border-b border-line bg-panel px-4 py-2 text-[12px] text-tx2">
+            <span className="flex-1 whitespace-pre-wrap">🔊 {diag}</span>
+            <button onClick={() => setDiag(null)} className="text-tx3 hover:text-tx2">✕</button>
+          </div>
+        )}
 
         <div ref={streamRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
           {captions.length === 0 && (
@@ -235,6 +256,14 @@ export default function LiveView({
             className="rounded-lg border border-line bg-panel2 px-4 py-2 text-[12.5px]"
           >
             🪟 懸浮字幕
+          </button>
+          <button
+            onClick={runDiag}
+            disabled={diagBusy || !engineOk}
+            className="rounded-lg border border-line bg-panel2 px-4 py-2 text-[12.5px] disabled:opacity-40"
+            title="播放影片時按下,檢查聲音是否流向轉錄抓取的裝置"
+          >
+            🔊 音訊診斷
           </button>
           {session && (
             <a

@@ -43,6 +43,9 @@ export const api = {
     req<{ ok: boolean; sample: string }>("/api/settings/test", { method: "POST" }),
   listModels: () =>
     req<{ models: string[]; recommended: string | null }>("/api/settings/models"),
+  audioDiag: () =>
+    req<{ devices: Array<Record<string, unknown>>; advice: string }>(
+      "/api/diagnostics/audio"),
   listSessions: () => req<Session[]>("/api/sessions"),
   getSession: (id: string) =>
     req<{ session: Session; speakers: Speaker[]; summary: { content_md: string } | null }>(

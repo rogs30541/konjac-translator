@@ -194,6 +194,12 @@ def create_app(store: Optional[Store] = None,
         set_vendor_override(app.state.app_settings.get("vendor_dir") or None)
         return _app_settings_view()
 
+    @app.get("/api/diagnostics/audio")
+    async def diagnostics_audio():
+        """音訊路徑診斷:播放聲音時呼叫,找出聲音實際流向哪個輸出裝置。"""
+        from .providers.audio_diag import probe_audio
+        return await probe_audio()
+
     @app.post("/api/maintenance/cleanup")
     async def cleanup():
         days = int(app.state.app_settings.get("retention_days") or 0)
