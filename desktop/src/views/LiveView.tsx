@@ -13,7 +13,15 @@ const MODES = [
   ["zh", "中文轉錄"],
 ] as const;
 
-export default function LiveView({ engineOk }: { engineOk: boolean }) {
+export default function LiveView({
+  engineOk,
+  vendorOk = true,
+  onGoSettings,
+}: {
+  engineOk: boolean;
+  vendorOk?: boolean;
+  onGoSettings?: () => void;
+}) {
   const [session, setSession] = useState<Session | null>(null);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [mode, setMode] = useState<string>("en2zh");
@@ -153,6 +161,17 @@ export default function LiveView({ engineOk }: { engineOk: boolean }) {
           </button>
         </div>
 
+        {engineOk && !vendorOk && (
+          <div className="flex items-center gap-3 border-b border-line bg-[#3a2f14] px-4 py-2 text-[12px] text-[#ffc46b]">
+            ⚠ AI 語音管線(jt-live-whisper)尚未設定,無法轉錄。
+            <button
+              onClick={onGoSettings}
+              className="rounded-md border border-[#ffc46b] px-2.5 py-1 text-[11.5px]"
+            >
+              前往設定 →
+            </button>
+          </div>
+        )}
         {error && (
           <div className="border-b border-line bg-brand-deep/20 px-4 py-2 text-[12px] text-brand">
             {error}

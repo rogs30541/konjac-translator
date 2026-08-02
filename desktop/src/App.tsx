@@ -67,7 +67,13 @@ export default function App() {
       </nav>
 
       <main className="min-w-0">
-        {page === "live" && <LiveView engineOk={!!health} />}
+        {page === "live" && (
+          <LiveView
+            engineOk={!!health}
+            vendorOk={health?.vendor_available !== false}
+            onGoSettings={() => setPage("settings")}
+          />
+        )}
         {page === "offline" && <OfflineView onOpenSession={openSession} />}
         {page === "library" && (
           <LibraryView selectedId={libSelected} onSelect={setLibSelected} />

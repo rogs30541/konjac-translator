@@ -41,4 +41,7 @@ export interface Health {
   status: string;
   version: string;
   provider: string;
+  vendor_available?: boolean;
+  vendor_dir?: string;
+  llm?: string | null;
 }
