@@ -37,6 +37,48 @@ export default function LibraryView({
   }, []);
   useEffect(refreshList, [refreshList]);
 
+  const captionCount = useCallback(async (id: string) => {
+    try {
+      return (await api.captions(id)).length;
+    } catch {
+      return -1;
+    }
+  }, []);
+
+  const deleteOne = async (id: string) => {
+    if (!window.confirm("刪除此紀錄?(字幕、講者、摘要一併刪除,無法復原)")) return;
+    await api.deleteSession(id);
+    if (selectedId === id) onSelect(null);
+    refreshList();
+  };
+
+  const cleanEmpty = async () => {
+    if (!window.confirm("清理所有「無字幕」與「錯誤」的紀錄?")) return;
+    const fresh = await api.listSessions(); // 用最新狀態,避免畫面 state 過期
+    let n = 0;
+    for (const it of fresh) {
+      if (it.status === "recording") continue;
+      if (it.status === "error" || (await captionCount(it.id)) === 0) {
+        await api.deleteSession(it.id);
+        n++;
+      }
+    }
+    setMsg(`✓ 已清理 ${n} 筆`);
+    if (selectedId) onSelect(null);
+    refreshList();
+  };
+
+  const deleteAll = async () => {
+    if (!window.confirm(`刪除全部 ${sessions.length} 筆紀錄?此動作無法復原!`)) return;
+    const fresh = await api.listSessions();
+    for (const it of fresh) {
+      if (it.status === "recording") continue; // 錄製中不動
+      await api.deleteSession(it.id);
+    }
+    onSelect(null);
+    refreshList();
+  };
+
   const openDetail = useCallback((id: string) => {
     api.getSession(id).then(setDetail).catch(() => setDetail(null));
     api.captions(id).then(setCaptions).catch(() => setCaptions([]));
@@ -67,6 +109,24 @@ export default function LibraryView({
     <div className="grid h-full grid-cols-[260px_1fr]">
       {/* 清單 */}
       <div className="overflow-y-auto border-r border-line bg-[#141720] p-3">
+        {sessions.length > 0 && (
+          <div className="mb-2 flex gap-1.5">
+            <button
+              onClick={cleanEmpty}
+              className="flex-1 rounded-lg border border-line bg-panel2 px-2 py-1.5 text-[11px] text-tx2"
+              title="刪除無字幕與錯誤的紀錄"
+            >
+              🧹 清理空白/錯誤
+            </button>
+            <button
+              onClick={deleteAll}
+              className="rounded-lg border border-brand-deep/60 bg-panel2 px-2 py-1.5 text-[11px] text-brand-deep"
+              title="刪除全部紀錄(錄製中除外)"
+            >
+              🗑 全部刪除
+            </button>
+          </div>
+        )}
         {sessions.map((it) => (
           <button
             key={it.id}
@@ -147,6 +207,14 @@ export default function LibraryView({
                 className="rounded-lg border border-brand-deep bg-brand/15 px-3 py-1.5 text-[12px] font-semibold text-brand disabled:opacity-40"
               >
                 📤 NotebookLM
+              </button>
+              <button
+                onClick={() => deleteOne(s.id)}
+                disabled={busy || s.status === "recording"}
+                className="ml-auto rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12px] text-brand-deep disabled:opacity-40"
+                title="刪除此紀錄"
+              >
+                🗑 刪除
               </button>
             </div>
             {msg && <div className="mt-2 text-[12px] text-tx2">{msg}</div>}

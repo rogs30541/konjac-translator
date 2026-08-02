@@ -66,14 +66,15 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="min-w-0">
-        {page === "live" && (
+      <main className="h-full min-w-0">
+        {/* 即時模式常駐掛載:切換頁面不中斷錄製/字幕流/計時 */}
+        <div className={page === "live" ? "h-full" : "hidden"}>
           <LiveView
             engineOk={!!health}
             vendorOk={health?.vendor_available !== false}
             onGoSettings={() => setPage("settings")}
           />
-        )}
+        </div>
         {page === "offline" && <OfflineView onOpenSession={openSession} />}
         {page === "library" && (
           <LibraryView selectedId={libSelected} onSelect={setLibSelected} />

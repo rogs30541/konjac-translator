@@ -53,6 +53,8 @@ export const api = {
       body: JSON.stringify({ title, kind: "live", mode, topic }),
     }),
   stop: (id: string) => req<Session>(`/api/sessions/${id}/stop`, { method: "POST" }),
+  deleteSession: (id: string) =>
+    fetch(`${ENGINE_BASE}/api/sessions/${id}`, { method: "DELETE" }),
   captions: (id: string) => req<Caption[]>(`/api/sessions/${id}/captions`),
   star: (id: string, seq: number) =>
     req(`/api/sessions/${id}/captions/${seq}/star`, { method: "POST" }),
