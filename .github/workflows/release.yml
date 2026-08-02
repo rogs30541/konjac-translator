@@ -30,7 +30,7 @@ jobs:
           cd engine
           python -m venv .venv
           .venv\Scripts\pip install -r requirements.txt pyinstaller
-          .venv\Scripts\pyinstaller --onefile --name konjac-engine `
+          .venv\Scripts\pyinstaller --onefile --noconsole --name konjac-engine `
             --collect-submodules uvicorn --collect-submodules websockets `
             --hidden-import app.main serve.py --noconfirm
           New-Item -ItemType Directory -Force ..\desktop\src-tauri\binaries | Out-Null

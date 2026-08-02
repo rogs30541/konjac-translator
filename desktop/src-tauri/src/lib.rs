@@ -1,7 +1,11 @@
 //! 翻譯蒟蒻桌面殼層:引擎 sidecar 生命週期 + 全域快捷鍵。
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
+
+/// 子程序不開主控台視窗(引擎在背景安靜執行)
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -16,6 +20,7 @@ fn kill_engine_tree(child: &mut Child) {
     let pid = child.id();
     let _ = Command::new("taskkill")
         .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .creation_flags(CREATE_NO_WINDOW)
         .status();
     let _ = child.wait();
 }
@@ -40,7 +45,9 @@ fn spawn_engine() -> std::io::Result<Child> {
         if let Some(dir) = exe.parent() {
             let bundled = dir.join("konjac-engine.exe");
             if bundled.is_file() {
-                return Command::new(bundled).spawn();
+                return Command::new(bundled)
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .spawn();
             }
         }
     }
@@ -52,6 +59,7 @@ fn spawn_engine() -> std::io::Result<Child> {
             "--host", "127.0.0.1", "--port", "8765",
         ])
         .current_dir(&dir)
+        .creation_flags(CREATE_NO_WINDOW)
         .spawn()
 }
 
@@ -101,12 +109,11 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![engine_status, restart_engine])
         .on_window_event(|window, event| {
-            // 主視窗關閉 = 縮到系統匣(引擎續跑,供 Chrome 擴充使用);
-            // 真正結束走系統匣選單「結束」
+            // 主視窗關閉 = 整個 App 含引擎一起結束(使用者要求;
+            // RunEvent::Exit 會 tree-kill 引擎程序樹)
             if window.label() == "main" {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = window.hide();
+                if let tauri::WindowEvent::CloseRequested { .. } = event {
+                    window.app_handle().exit(0);
                 }
             }
         })
