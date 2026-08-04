@@ -83,7 +83,7 @@ class LLMSettings:
 
 
 APP_DEFAULTS = {"keywords": [], "webhooks": [], "retention_days": 0,
-                "vendor_dir": ""}
+                "vendor_dir": "", "idle_stop_minutes": 5}
 
 
 class SettingsStore:

@@ -121,6 +121,9 @@ export default function LiveView({
       const kw = String(lastEvent.data.keyword);
       setKwHits((prev) => new Map(prev).set(kw, (prev.get(kw) ?? 0) + 1));
     }
+    if (lastEvent.type === "engine" && lastEvent.data.type === "idle_stop") {
+      setError(`⏱ ${String(lastEvent.data.detail ?? "已因閒置自動停止錄製")}`);
+    }
     if (lastEvent.type === "status" && lastEvent.data.status === "done") {
       setSession((s) => (s ? { ...s, status: "done" } : s));
     }

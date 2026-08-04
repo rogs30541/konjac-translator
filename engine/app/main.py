@@ -189,6 +189,8 @@ def create_app(store: Optional[Store] = None,
                                    if isinstance(h, dict)]
         if "retention_days" in body:
             cleaned["retention_days"] = max(0, int(body["retention_days"] or 0))
+        if "idle_stop_minutes" in body:
+            cleaned["idle_stop_minutes"] = max(0.0, float(body["idle_stop_minutes"] or 0))
         if "vendor_dir" in body:
             cleaned["vendor_dir"] = str(body["vendor_dir"] or "").strip()
         app.state.app_settings = app.state.settings_store.save_app(
@@ -281,7 +283,9 @@ def create_app(store: Optional[Store] = None,
                 st, hub, session.id, req.mode, factory,
                 topic=req.topic, llm_getter=app.state.get_llm,
                 upstream_mode=UPSTREAM_ASR_MODE.get(req.mode),
-                on_caption=app.state.after_caption)
+                on_caption=app.state.after_caption,
+                idle_getter=lambda: float(
+                    app.state.app_settings.get("idle_stop_minutes") or 0) * 60)
         except Exception as e:
             st.set_status(session.id, SessionStatus.error, ended=True)
             raise HTTPException(500, f"failed to start live pipeline: {e}")

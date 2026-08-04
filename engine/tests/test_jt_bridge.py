@@ -104,6 +104,28 @@ def test_live_watchdog_marks_error_on_process_death(client, monkeypatch):
     assert s["ended_at"] is not None
 
 
+def test_idle_auto_stop(client):
+    """超過閒置逾時沒有新字幕 → 引擎自動停止錄製並標記 done。"""
+    # 0.03 分鐘 = 1.8 秒;fake 送完 3 事件後掛著不動 → 觸發閒置
+    client.put("/api/settings/app", json={"idle_stop_minutes": 0.03})
+    r = client.post("/api/live/start", json={"title": "閒置測試", "kind": "live"})
+    assert r.status_code == 201
+    sid = r.json()["id"]
+
+    deadline = time.time() + 15
+    s = None
+    while time.time() < deadline:
+        s = client.get(f"/api/sessions/{sid}").json()["session"]
+        if s["status"] != "recording":
+            break
+        time.sleep(0.3)
+    assert s["status"] == "done", s
+    assert s["ended_at"] is not None
+    # 字幕仍保留(自動停止≠刪除)
+    assert len(client.get(f"/api/sessions/{sid}/captions").json()) == 2
+    client.put("/api/settings/app", json={"idle_stop_minutes": 5})
+
+
 def test_live_unavailable_when_script_missing():
     missing = JtBridgeConfig(script=Path("D:/nope/translate_meeting.py"), port=0)
 

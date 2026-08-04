@@ -24,6 +24,7 @@ export interface AppSettings {
   keywords: string[];
   webhooks: Array<Partial<Record<string, string>> & { type: string }>;
   retention_days: number;
+  idle_stop_minutes: number;
   vendor_dir: string;
   vendor_available: boolean;
   vendor_resolved: string;

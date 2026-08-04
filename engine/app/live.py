@@ -64,7 +64,7 @@ class LiveRunner:
     def __init__(self, store: Store, hub: Hub, session_id: str,
                  bridge_factory, mode: str = "en",
                  topic: str | None = None, llm_getter=None,
-                 on_caption=None) -> None:
+                 on_caption=None, idle_getter=None, on_idle=None) -> None:
         self._store = store
         self._hub = hub
         self._sid = session_id
@@ -76,6 +76,9 @@ class LiveRunner:
         self._llm_getter = llm_getter or (lambda: None)
         self._on_caption = on_caption  # 關鍵字/webhook 等後處理 hook
         self._stopping = False
+        self._idle_getter = idle_getter or (lambda: 0)  # 秒;<=0 停用
+        self._on_idle = on_idle
+        self._last_activity = time.monotonic()
 
     @property
     def running(self) -> bool:
@@ -83,8 +86,27 @@ class LiveRunner:
 
     async def start(self, mode: str) -> None:
         self._t0 = time.monotonic()
+        self._last_activity = time.monotonic()
         await self._bridge.start(mode)
         asyncio.ensure_future(self._watch_process())
+        asyncio.ensure_future(self._watch_idle())
+
+    async def _watch_idle(self) -> None:
+        """閒置看門狗:超過設定秒數沒有新字幕 → 自動停止錄製。
+        逾時值每輪重讀(設定頁改了即時生效);<=0 表示停用。"""
+        while not self._stopping:
+            timeout = float(self._idle_getter() or 0)
+            interval = min(10.0, max(0.5, timeout / 4)) if timeout > 0 else 10.0
+            await asyncio.sleep(interval)
+            if self._stopping:
+                return
+            timeout = float(self._idle_getter() or 0)
+            if timeout <= 0:
+                continue
+            if time.monotonic() - self._last_activity > timeout:
+                if self._on_idle:
+                    await self._on_idle()
+                return
 
     async def _watch_process(self) -> None:
         """看門狗:上游程序死亡(非正常停止)→ session 標記 error 並通知前端,
@@ -109,6 +131,7 @@ class LiveRunner:
                                    time.monotonic() - self._t0)
             if cap is None:
                 return  # 幻覺過濾後的空事件
+            self._last_activity = time.monotonic()
             self._seq += 1
             c = self._store.upsert_caption(self._sid, cap)
             await self._hub.broadcast(
@@ -160,10 +183,19 @@ class LiveManager:
     async def start(self, store: Store, hub: Hub, sid: str, mode: str,
                     bridge_factory, topic: str | None = None,
                     llm_getter=None, upstream_mode: str | None = None,
-                    on_caption=None) -> LiveRunner:
+                    on_caption=None, idle_getter=None) -> LiveRunner:
+        async def on_idle():
+            minutes = round(float(idle_getter() or 0) / 60, 1) if idle_getter else 0
+            if await self.stop(store, hub, sid):
+                await hub.broadcast(sid, WsEvent(
+                    type="engine",
+                    data={"type": "idle_stop",
+                          "detail": f"超過 {minutes:g} 分鐘沒有新字幕,已自動停止錄製"}))
+
         runner = LiveRunner(store, hub, sid, bridge_factory,
                             mode=mode, topic=topic, llm_getter=llm_getter,
-                            on_caption=on_caption)
+                            on_caption=on_caption, idle_getter=idle_getter,
+                            on_idle=on_idle)
         await runner.start(upstream_mode or mode)
         self._runners[sid] = runner
         return runner

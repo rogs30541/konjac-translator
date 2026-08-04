@@ -57,6 +57,7 @@ export default function SettingsView() {
   const [keywords, setKeywords] = useState("");
   const [hooksText, setHooksText] = useState("");
   const [retention, setRetention] = useState(0);
+  const [idleStop, setIdleStop] = useState(5);
   const [vendorDir, setVendorDir] = useState("");
   const [vendorOk, setVendorOk] = useState(false);
   const [vendorResolved, setVendorResolved] = useState("");
@@ -75,6 +76,7 @@ export default function SettingsView() {
       setKeywords(a.keywords.join(", "));
       setHooksText(hooksToText(a.webhooks));
       setRetention(a.retention_days);
+      setIdleStop(a.idle_stop_minutes ?? 5);
       setVendorDir(a.vendor_dir);
       setVendorOk(a.vendor_available);
       setVendorResolved(a.vendor_resolved);
@@ -89,6 +91,7 @@ export default function SettingsView() {
         keywords: keywords.split(/[,،、\n]/).map((k) => k.trim()).filter(Boolean),
         webhooks: textToHooks(hooksText),
         retention_days: retention,
+        idle_stop_minutes: idleStop,
         vendor_dir: vendorDir.trim(),
       });
       setKeywords(saved.keywords.join(", "));
@@ -314,6 +317,16 @@ export default function SettingsView() {
             rows={3}
             placeholder="discord|https://discord.com/api/webhooks/…"
             className="mt-1 block w-full rounded-lg border border-line bg-panel2 px-3 py-2 font-mono text-[11.5px]"
+          />
+        </label>
+        <label className="text-[12.5px] text-tx2">
+          閒置自動停止(分鐘) <span className="text-tx3">(超過此時間沒有新字幕自動停止錄製;0 = 不自動停止;預設 5)</span>
+          <input
+            type="number"
+            min={0}
+            value={idleStop}
+            onChange={(e) => setIdleStop(Math.max(0, Number(e.target.value) || 0))}
+            className="mt-1 block w-28 rounded-lg border border-line bg-panel2 px-3 py-2 text-[12.5px]"
           />
         </label>
         <label className="text-[12.5px] text-tx2">
