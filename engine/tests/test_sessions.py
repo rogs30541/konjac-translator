@@ -30,6 +30,26 @@ def test_session_lifecycle(client, live_session):
     assert client.get(f"/api/sessions/{sid}").status_code == 404
 
 
+def test_zombie_reconcile_on_boot(store, tmp_path):
+    """引擎啟動時,遺留的 recording/processing session 一律收斂為 error。"""
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    from app.models import SessionCreate, SessionKind
+    from app.providers.cloud_llm import SettingsStore
+    from app.providers.mock import MockOfflinePipeline
+
+    zombie = store.create_session(SessionCreate(
+        title="殭屍場次", kind=SessionKind.live, mode="zh"))
+    assert store.get_session(zombie.id).status.value == "recording"
+
+    app = create_app(store=store, offline_pipeline=MockOfflinePipeline(),
+                     settings_store=SettingsStore(tmp_path / "s.json"))
+    with TestClient(app) as c:
+        s = c.get(f"/api/sessions/{zombie.id}").json()["session"]
+        assert s["status"] == "error"
+        assert s["ended_at"] is not None
+
+
 def test_unknown_session_404(client):
     assert client.get("/api/sessions/nope").status_code == 404
     assert client.post("/api/sessions/nope/stop").status_code == 404

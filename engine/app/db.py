@@ -118,6 +118,17 @@ class Store:
             self._conn.execute("DELETE FROM sessions WHERE id=?", (sid,))
             self._conn.commit()
 
+    def reconcile_zombies(self) -> int:
+        """引擎啟動時:上次沒正常結束的 recording/processing session
+        全部標記 error(啟動當下不可能有真正在跑的 runner)。"""
+        with self._lock:
+            cur = self._conn.execute(
+                "UPDATE sessions SET status='error', ended_at=? "
+                "WHERE status IN ('recording','processing')",
+                (utcnow().isoformat(),))
+            self._conn.commit()
+        return cur.rowcount
+
     def delete_older_than(self, days: int) -> int:
         """隱私保留:刪除超過 days 天的 session(cascade 字幕/講者/摘要)。"""
         if days <= 0:

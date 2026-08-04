@@ -111,6 +111,18 @@ export default function LiveView({
       setElapsed(0);
       setKwHits(new Map());
     } catch (e) {
+      // 409:引擎上已有進行中的場次 → 直接接回,不報錯
+      if (String(e).includes("409")) {
+        try {
+          const all = await api.listSessions();
+          const rec = all.find((x) => x.kind === "live" && x.status === "recording");
+          if (rec) {
+            setSession(rec);
+            setError(null);
+            return;
+          }
+        } catch { /* fallthrough */ }
+      }
       setError(String(e));
     } finally {
       setBusy(false);
@@ -123,7 +135,13 @@ export default function LiveView({
     try {
       setSession(await api.stop(session.id));
     } catch (e) {
-      setError(String(e));
+      if (String(e).includes("404")) {
+        // session 已不存在(引擎重啟後的殭屍)→ 復位回待機,不卡在錄製畫面
+        setSession(null);
+        setError("該場錄製已不存在(引擎曾重啟),已重置,可重新開始錄製");
+      } else {
+        setError(String(e));
+      }
     } finally {
       setBusy(false);
     }

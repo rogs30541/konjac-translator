@@ -21,6 +21,37 @@ from typing import Awaitable, Callable, Optional
 OnEvent = Callable[[dict], Awaitable[None]]
 
 
+# 上游 13623 行把中/日文模式的 ASR 強制改回 whisper.cpp(未編譯即死),
+# 本意只是擋英文限定的 Moonshine;faster-whisper 可辨識中日文(離線路徑即是)。
+# 僅在「完全匹配」時套用,留 .konjac-bak 備份,冪等。
+_PATCH_OLD = (
+    '        # 中文/日文模式強制 whisper（Moonshine 僅支援英文）\n'
+    '        if mode not in ("en2zh", "en"):\n'
+    '            asr_engine = "whisper"\n')
+_PATCH_NEW = (
+    '        # 中文/日文模式禁用 Moonshine（僅支援英文）；faster-whisper 可辨識中日文\n'
+    '        if mode not in ("en2zh", "en") and asr_engine == "moonshine":\n'
+    '            asr_engine = "whisper"\n')
+
+
+def ensure_vendor_patch() -> str:
+    """回傳 patched / already / skipped(版本不符或檔案不存在)。"""
+    script = vendor_script()
+    if not script.is_file():
+        return "skipped"
+    try:
+        text = script.read_text(encoding="utf-8")
+        if _PATCH_NEW in text:
+            return "already"
+        if _PATCH_OLD not in text:
+            return "skipped"  # 上游版本變了,不盲目亂改
+        script.with_suffix(".py.konjac-bak").write_text(text, encoding="utf-8")
+        script.write_text(text.replace(_PATCH_OLD, _PATCH_NEW, 1), encoding="utf-8")
+        return "patched"
+    except OSError:
+        return "skipped"
+
+
 def _upstream_log():
     """上游輸出寫到 ~/.konjac/jt-upstream.log(取代丟棄,便於診斷)。"""
     try:
@@ -107,6 +138,7 @@ class JtLiveBridge:
     async def start(self, mode: str) -> None:
         if not self._cfg.script.is_file():
             raise FileNotFoundError(f"jt script not found: {self._cfg.script}")
+        ensure_vendor_patch()  # 中/日文模式 faster-whisper 修正(冪等)
         # 先開 server 再 spawn,子程序重試 3 次連線的窗口內必定就緒
         self._server = await asyncio.start_server(
             self._handle_conn, "127.0.0.1", self._cfg.port)

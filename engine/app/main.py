@@ -114,7 +114,9 @@ def create_app(store: Optional[Store] = None,
                 client=app.state.webhook_client))
 
     app.state.after_caption = after_caption
-    # 啟動時執行保留天數清理(retention_days=0 表示不清理)
+    # 啟動時:殭屍 session 收斂(上次未正常結束的 recording → error)
+    app.state.store.reconcile_zombies()
+    # 保留天數清理(retention_days=0 表示不清理)
     app.state.store.delete_older_than(
         int(app.state.app_settings.get("retention_days") or 0))
     app.state.bridge_factory_injected = bridge_factory
