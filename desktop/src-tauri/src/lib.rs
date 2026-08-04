@@ -109,11 +109,12 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![engine_status, restart_engine])
         .on_window_event(|window, event| {
-            // 主視窗關閉 = 整個 App 含引擎一起結束(使用者要求;
-            // RunEvent::Exit 會 tree-kill 引擎程序樹)
+            // 主視窗關閉 = 縮到系統匣背景運作(引擎續跑,字幕/擴充不中斷);
+            // 完整結束走系統匣選單「結束(含引擎)」→ RunEvent::Exit tree-kill
             if window.label() == "main" {
-                if let tauri::WindowEvent::CloseRequested { .. } = event {
-                    window.app_handle().exit(0);
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
                 }
             }
         })

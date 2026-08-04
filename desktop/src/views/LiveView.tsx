@@ -13,6 +13,27 @@ const MODES = [
   ["zh", "中文轉錄"],
 ] as const;
 
+const GROUP_SIZE = 5; // 每滿 5 句收合為一段
+
+/** 中文句間補逗號直接串接;英文以空格串接。 */
+function mergeParagraph(parts: string[]): string {
+  const cjk = /[一-鿿]/.test(parts.join(""));
+  if (!cjk) return parts.join(" ");
+  return parts
+    .map((p, i) => {
+      const t = p.trim();
+      if (i === parts.length - 1) return t;
+      return /[。!?,、;:….!?,]$/.test(t) ? t : `${t},`;
+    })
+    .join("");
+}
+
+function hms(t: number): string {
+  const s = Math.floor(t);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`;
+}
+
 export default function LiveView({
   engineOk,
   vendorOk = true,
@@ -33,6 +54,7 @@ export default function LiveView({
   const [kwHits, setKwHits] = useState<Map<string, number>>(new Map());
   const [diag, setDiag] = useState<string | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
 
   const runDiag = async () => {
     setDiagBusy(true);
@@ -50,6 +72,19 @@ export default function LiveView({
   const recording = session?.status === "recording";
   const { captions, connected, lastEvent } = useCaptionStream(session?.id ?? null);
   const streamRef = useRef<HTMLDivElement>(null);
+
+  // 每滿 GROUP_SIZE 句收合為段落;尾端未滿的維持逐句展開
+  const nGroups = Math.floor(captions.length / GROUP_SIZE);
+  const grouped = Array.from({ length: nGroups }, (_, g) =>
+    captions.slice(g * GROUP_SIZE, (g + 1) * GROUP_SIZE));
+  const tail = captions.slice(nGroups * GROUP_SIZE);
+  const toggleGroup = (g: number) =>
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+      return next;
+    });
 
   useEffect(() => {
     if (!recording || !session) return;
@@ -245,12 +280,57 @@ export default function LiveView({
                 : "按「開始錄製」擷取系統音訊並即時轉錄翻譯(Ctrl+Shift+R)"}
             </div>
           )}
-          {captions.map((c, i) => (
+          {grouped.map((g, gi) => {
+            const expanded = expandedGroups.has(gi);
+            const mainTexts = g.map((c) => c.translated_text ?? c.source_text);
+            const srcTexts = g
+              .filter((c) => c.translated_text && c.source_text !== c.translated_text)
+              .map((c) => c.source_text);
+            return (
+              <div key={`g${gi}`} className="rounded-xl border border-line bg-[#171a22]">
+                <button
+                  onClick={() => toggleGroup(gi)}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-[11.5px] text-tx3"
+                >
+                  <span>{expanded ? "▾" : "▸"}</span>
+                  <span>
+                    第 {gi + 1} 段 · {hms(g[0].t_start)}–{hms(g[g.length - 1].t_start)} ·{" "}
+                    {g.length} 句
+                  </span>
+                </button>
+                {expanded ? (
+                  <div className="flex flex-col gap-2.5 px-3 pb-3">
+                    {g.map((c) => (
+                      <CaptionCard
+                        key={c.seq}
+                        cap={c}
+                        speakers={speakerMap}
+                        onStar={(seq) =>
+                          session && api.star(session.id, seq).catch(() => {})}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 pb-3">
+                    {srcTexts.length > 0 && (
+                      <div className="mb-1 text-[12px] leading-relaxed text-tx3">
+                        {mergeParagraph(srcTexts)}
+                      </div>
+                    )}
+                    <div className="text-[14px] leading-relaxed">
+                      {mergeParagraph(mainTexts)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {tail.map((c, i) => (
             <CaptionCard
               key={c.seq}
               cap={c}
               speakers={speakerMap}
-              live={recording && i === captions.length - 1}
+              live={recording && i === tail.length - 1}
               onStar={(seq) => session && api.star(session.id, seq).catch(() => {})}
             />
           ))}
