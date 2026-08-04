@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from .jt_bridge import _default_python, vendor_available
+from .jt_bridge import CREATE_NO_WINDOW, _default_python, vendor_available
 
 _PROBE_CODE = r"""
 import json, math, struct, time
@@ -61,7 +61,8 @@ async def probe_audio(timeout: float = 30.0) -> dict:
         return {"devices": [], "advice": "AI 管線未設定,無法診斷(需要 vendor venv)"}
     proc = await asyncio.create_subprocess_exec(
         _default_python(), "-c", _PROBE_CODE,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        creationflags=CREATE_NO_WINDOW)
     try:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
     except asyncio.TimeoutError:

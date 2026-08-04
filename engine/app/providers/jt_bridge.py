@@ -20,6 +20,9 @@ from typing import Awaitable, Callable, Optional
 
 OnEvent = Callable[[dict], Awaitable[None]]
 
+# 引擎(--noconsole)生 console 子程序時 Windows 會另開視窗;全部隱藏執行
+CREATE_NO_WINDOW = 0x0800_0000 if os.name == "nt" else 0
+
 
 # 上游 13623 行把中/日文模式的 ASR 強制改回 whisper.cpp(未編譯即死),
 # 本意只是擋英文限定的 Moonshine;faster-whisper 可辨識中日文(離線路徑即是)。
@@ -157,7 +160,8 @@ class JtLiveBridge:
             *self._cfg.extra_args,
             cwd=str(self._cfg.script.parent), env=env,
             stdin=asyncio.subprocess.PIPE,
-            stdout=log, stderr=asyncio.subprocess.STDOUT)
+            stdout=log, stderr=asyncio.subprocess.STDOUT,
+            creationflags=CREATE_NO_WINDOW)
         await _auto_confirm(self._proc)
 
     async def wait_proc(self) -> int | None:
@@ -250,7 +254,8 @@ class JtOfflineBridge:
         bridge._proc = await asyncio.create_subprocess_exec(
             *args, cwd=str(self._cfg.script.parent), env=env,
             stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            creationflags=CREATE_NO_WINDOW)
         await _auto_confirm(bridge._proc)
 
         try:
