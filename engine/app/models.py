@@ -83,6 +83,7 @@ class SummaryResult(BaseModel):
 class ForwardRequest(BaseModel):
     target_notebook: str = Field(min_length=1)
     scope: str = "full"  # full | summary_only | starred_only
+    open_browser: bool = False  # 桌面一鍵流程:複製剪貼簿 + 開啟 NotebookLM
 
 
 class WsEvent(BaseModel):

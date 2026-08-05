@@ -105,6 +105,8 @@ export default function LiveView({
     setBusy(true);
     setError(null);
     setSummary(null);
+    setSession(null); // 新會議:立即清空上一場畫面
+    setKwHits(new Map());
     try {
       const s = await api.liveStart(
         `即時會議 ${new Date().toLocaleString("zh-TW")}`,
@@ -303,7 +305,11 @@ export default function LiveView({
             disabled={!session || captions.length === 0}
             onClick={() =>
               session &&
-              api.forwardNotebookLM(session.id, "預設筆記本", "full").catch((e) => setError(String(e)))
+              api
+                .forwardNotebookLM(session.id, "翻譯蒟蒻紀錄", "full", true, true)
+                .then(() =>
+                  setError("✓ 內容已複製到剪貼簿並開啟 NotebookLM:新增來源 →「複製的文字」→ 貼上"))
+                .catch((e) => setError(String(e)))
             }
             className="rounded-lg border border-brand-deep bg-brand/15 px-4 py-2 text-[12.5px] font-semibold text-brand disabled:opacity-40"
           >

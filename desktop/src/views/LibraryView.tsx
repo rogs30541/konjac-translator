@@ -251,7 +251,7 @@ export default function LibraryView({
           onClose={() => setShowForward(false)}
           onDone={() => {
             setShowForward(false);
-            setMsg("✓ 轉發 payload 已產生並標記(實際傳送由 Chrome 擴充側欄執行)");
+            setMsg("✓ 內容已複製到剪貼簿並開啟 NotebookLM:新增來源 →「複製的文字」→ 貼上即完成");
             openDetail(s.id);
             refreshList();
           }}

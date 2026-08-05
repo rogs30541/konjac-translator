@@ -72,10 +72,14 @@ export const api = {
       `/api/sessions/${id}/summary?template=${template}`, { method: "POST" }),
   exportUrl: (id: string, format: string) =>
     `${ENGINE_BASE}/api/sessions/${id}/export?format=${format}`,
-  forwardNotebookLM: (id: string, notebook: string, scope: string, force = false) =>
-    req<{ payload_md: string }>(
+  forwardNotebookLM: (
+    id: string, notebook: string, scope: string, force = false, openBrowser = false,
+  ) =>
+    req<{ payload_md: string; opened_browser: boolean }>(
       `/api/sessions/${id}/forward/notebooklm?force=${force}`, {
         method: "POST",
-        body: JSON.stringify({ target_notebook: notebook, scope }),
+        body: JSON.stringify({
+          target_notebook: notebook, scope, open_browser: openBrowser,
+        }),
       }),
 };

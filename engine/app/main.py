@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import subprocess
 import sys
 import tempfile
 import uuid
@@ -40,6 +41,25 @@ ENGINE_VERSION = "0.2.0"
 
 # 翻譯模式 → 上游純轉錄模式(翻譯由引擎的雲端 LLM 執行,不用上游 Ollama)
 UPSTREAM_ASR_MODE = {"en2zh": "en", "zh2en": "zh", "ja2zh": "ja"}
+
+
+def _clipboard_and_open_notebooklm(payload: str) -> bool:
+    """內容進剪貼簿(UTF-8 安全,經 PowerShell Set-Clipboard)+ 預設瀏覽器
+    開啟 NotebookLM。失敗回 False(前端顯示手動指引)。"""
+    if os.name != "nt":
+        return False
+    try:
+        tmp = Path(tempfile.gettempdir()) / f"konjac_nblm_{uuid.uuid4().hex[:8]}.md"
+        tmp.write_text(payload, encoding="utf-8")
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             f"Set-Clipboard -Value (Get-Content -Raw -Encoding UTF8 '{tmp}')"],
+            creationflags=0x0800_0000, timeout=15, check=True)
+        tmp.unlink(missing_ok=True)
+        os.startfile("https://notebooklm.google.com/")  # noqa: S606
+        return True
+    except Exception:
+        return False
 
 
 def default_bridge_factory(on_event):
@@ -363,9 +383,13 @@ def create_app(store: Optional[Store] = None,
             raise HTTPException(409, "already forwarded; pass force=true to resend")
         payload = to_notebooklm_markdown(st, s, scope=req.scope)
         st.mark_forwarded(sid, req.target_notebook)
-        # 引擎只產生 payload 並記錄;實際傳送由 Chrome 擴充/API connector 執行
+        # 桌面一鍵流程:內容進剪貼簿 + 預設瀏覽器開 NotebookLM,
+        # 使用者「新增來源 → 複製的文字 → 貼上」即完成
+        opened = False
+        if req.open_browser:
+            opened = _clipboard_and_open_notebooklm(payload)
         return {"target_notebook": req.target_notebook, "scope": req.scope,
-                "payload_md": payload}
+                "payload_md": payload, "opened_browser": opened}
 
     # ---------- offline jobs ----------
     @app.post("/api/offline/jobs", status_code=202)

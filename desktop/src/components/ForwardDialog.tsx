@@ -35,7 +35,7 @@ export default function ForwardDialog({ session, onClose, onDone }: Props) {
     try {
       await api.forwardNotebookLM(
         session.id, notebook.trim() || "翻譯蒟蒻紀錄", scope,
-        !!session.notebooklm_forwarded_at);
+        !!session.notebooklm_forwarded_at, true);
       onDone();
     } catch (e) {
       setMsg(String(e));
@@ -102,11 +102,12 @@ export default function ForwardDialog({ session, onClose, onDone }: Props) {
             disabled={busy}
             className="rounded-lg border border-brand-deep bg-brand/15 px-4 py-2 text-[12.5px] font-semibold text-brand disabled:opacity-40"
           >
-            {busy ? "送出中…" : "產生並標記轉發"}
+            {busy ? "送出中…" : "複製並開啟 NotebookLM"}
           </button>
         </div>
         <div className="mt-2 text-[10.5px] text-tx3">
-          實際傳入 NotebookLM 由 Chrome 擴充執行(側欄 📤 按鈕);此處產生 payload 並記錄轉發狀態。
+          送出後:內容已在剪貼簿、NotebookLM 已開啟 → 選筆記本 →「新增來源」→
+          「複製的文字」→ 貼上(Ctrl+V)即完成。
         </div>
       </div>
     </div>

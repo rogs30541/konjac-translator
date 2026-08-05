@@ -15,7 +15,9 @@ export function useCaptionStream(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
+    // 換場(新會議)即清空畫面與截斷旗標
     setCaptions([]);
+    setCapped(false);
     if (!sessionId) return;
     let closed = false;
     let retry: number | undefined;
