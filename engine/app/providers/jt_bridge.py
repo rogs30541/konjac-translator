@@ -56,11 +56,15 @@ def ensure_vendor_patch() -> str:
 
 
 def _upstream_log():
-    """上游輸出寫到 ~/.konjac/jt-upstream.log(取代丟棄,便於診斷)。"""
+    """上游輸出寫到 ~/.konjac/jt-upstream.log(取代丟棄,便於診斷);
+    超過 10MB 輪替為 .old,防止長期使用無限膨脹。"""
     try:
         log_dir = Path.home() / ".konjac"
         log_dir.mkdir(parents=True, exist_ok=True)
-        return open(log_dir / "jt-upstream.log", "ab")
+        log_path = log_dir / "jt-upstream.log"
+        if log_path.is_file() and log_path.stat().st_size > 10 * 1024 * 1024:
+            log_path.replace(log_path.with_suffix(".log.old"))
+        return open(log_path, "ab")
     except OSError:
         return asyncio.subprocess.DEVNULL
 

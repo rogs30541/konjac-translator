@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import CaptionCard from "../components/CaptionCard";
+import CaptionOutline from "../components/CaptionOutline";
 import SpeakerPanel from "../components/SpeakerPanel";
 import type { Session, Speaker } from "../types";
 import { useCaptionStream } from "../ws";
@@ -13,27 +13,6 @@ const MODES = [
   ["zh", "中文轉錄"],
 ] as const;
 
-const GROUP_SIZE = 5; // 每滿 5 句收合為一段
-const CHAPTER_SEC = 15 * 60; // 每 15 分鐘的完整段落收合為一章
-
-/** 中文句間補逗號直接串接;英文以空格串接。 */
-function mergeParagraph(parts: string[]): string {
-  const cjk = /[一-鿿]/.test(parts.join(""));
-  if (!cjk) return parts.join(" ");
-  return parts
-    .map((p, i) => {
-      const t = p.trim();
-      if (i === parts.length - 1) return t;
-      return /[。!?,、;:….!?,]$/.test(t) ? t : `${t},`;
-    })
-    .join("");
-}
-
-function hms(t: number): string {
-  const s = Math.floor(t);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`;
-}
 
 export default function LiveView({
   engineOk,
@@ -55,8 +34,6 @@ export default function LiveView({
   const [kwHits, setKwHits] = useState<Map<string, number>>(new Map());
   const [diag, setDiag] = useState<string | null>(null);
   const [diagBusy, setDiagBusy] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
-  const [expandedChapters, setExpandedChapters] = useState<Set<number>>(new Set());
 
   const runDiag = async () => {
     setDiagBusy(true);
@@ -72,44 +49,8 @@ export default function LiveView({
   };
 
   const recording = session?.status === "recording";
-  const { captions, connected, lastEvent } = useCaptionStream(session?.id ?? null);
+  const { captions, connected, capped, lastEvent } = useCaptionStream(session?.id ?? null);
   const streamRef = useRef<HTMLDivElement>(null);
-
-  // 每滿 GROUP_SIZE 句收合為段落;尾端未滿的維持逐句展開
-  const nGroups = Math.floor(captions.length / GROUP_SIZE);
-  const grouped = Array.from({ length: nGroups }, (_, g) =>
-    captions.slice(g * GROUP_SIZE, (g + 1) * GROUP_SIZE));
-  const tail = captions.slice(nGroups * GROUP_SIZE);
-  const toggleGroup = (g: number) =>
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(g)) next.delete(g);
-      else next.add(g);
-      return next;
-    });
-
-  // 每 15 分鐘的完整段落收合為章節;目前進行中的 15 分鐘維持段落卡
-  const latestT = captions.length ? captions[captions.length - 1].t_start : 0;
-  const currentChapterIdx = Math.floor(latestT / CHAPTER_SEC);
-  const chapterMap = new Map<number, number[]>(); // 章節時間索引 → 段落索引
-  const currentGroupIdxs: number[] = [];
-  grouped.forEach((g, gi) => {
-    const ch = Math.floor(g[0].t_start / CHAPTER_SEC);
-    if (ch < currentChapterIdx) {
-      if (!chapterMap.has(ch)) chapterMap.set(ch, []);
-      chapterMap.get(ch)!.push(gi);
-    } else {
-      currentGroupIdxs.push(gi);
-    }
-  });
-  const chapterList = [...chapterMap.entries()].sort((a, b) => a[0] - b[0]);
-  const toggleChapter = (c: number) =>
-    setExpandedChapters((prev) => {
-      const next = new Set(prev);
-      if (next.has(c)) next.delete(c);
-      else next.add(c);
-      return next;
-    });
 
   useEffect(() => {
     if (!recording || !session) return;
@@ -308,108 +249,17 @@ export default function LiveView({
                 : "按「開始錄製」擷取系統音訊並即時轉錄翻譯(Ctrl+Shift+R)"}
             </div>
           )}
-          {(() => {
-            const renderGroup = (gi: number) => {
-              const g = grouped[gi];
-              const expanded = expandedGroups.has(gi);
-              const mainTexts = g.map((c) => c.translated_text ?? c.source_text);
-              const srcTexts = g
-                .filter((c) => c.translated_text && c.source_text !== c.translated_text)
-                .map((c) => c.source_text);
-              return (
-                <div key={`g${gi}`} className="rounded-xl border border-line bg-[#171a22]">
-                  <button
-                    onClick={() => toggleGroup(gi)}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-[11.5px] text-tx3"
-                  >
-                    <span>{expanded ? "▾" : "▸"}</span>
-                    <span>
-                      第 {gi + 1} 段 · {hms(g[0].t_start)}–{hms(g[g.length - 1].t_start)} ·{" "}
-                      {g.length} 句
-                    </span>
-                  </button>
-                  {expanded ? (
-                    <div className="flex flex-col gap-2.5 px-3 pb-3">
-                      {g.map((c) => (
-                        <CaptionCard
-                          key={c.seq}
-                          cap={c}
-                          speakers={speakerMap}
-                          onStar={(seq) =>
-                            session && api.star(session.id, seq).catch(() => {})}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="px-4 pb-3">
-                      {srcTexts.length > 0 && (
-                        <div className="mb-1 text-[12px] leading-relaxed text-tx3">
-                          {mergeParagraph(srcTexts)}
-                        </div>
-                      )}
-                      <div className="text-[14px] leading-relaxed">
-                        {mergeParagraph(mainTexts)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            };
-
-            return (
-              <>
-                {chapterList.map(([chIdx, groupIdxs], order) => {
-                  const chExpanded = expandedChapters.has(chIdx);
-                  const first = grouped[groupIdxs[0]][0];
-                  const lastG = grouped[groupIdxs[groupIdxs.length - 1]];
-                  const nSent = groupIdxs.reduce((n, gi) => n + grouped[gi].length, 0);
-                  const preview = mergeParagraph(
-                    grouped[groupIdxs[0]].map((c) => c.translated_text ?? c.source_text),
-                  ).slice(0, 60);
-                  return (
-                    <div
-                      key={`ch${chIdx}`}
-                      className="rounded-xl border border-[#3a3f52] bg-[#12151d]"
-                    >
-                      <button
-                        onClick={() => toggleChapter(chIdx)}
-                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
-                      >
-                        <span className="text-[11.5px] text-tx3">
-                          {chExpanded ? "▾" : "▸"}
-                        </span>
-                        <span className="text-[12px] font-semibold text-tx2">
-                          第 {order + 1} 章 · {hms(first.t_start)}–
-                          {hms(lastG[lastG.length - 1].t_start)} · {groupIdxs.length} 段{" "}
-                          {nSent} 句
-                        </span>
-                        {!chExpanded && (
-                          <span className="ml-2 flex-1 truncate text-[11.5px] text-tx3">
-                            {preview}…
-                          </span>
-                        )}
-                      </button>
-                      {chExpanded && (
-                        <div className="flex flex-col gap-2.5 px-3 pb-3">
-                          {groupIdxs.map(renderGroup)}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {currentGroupIdxs.map(renderGroup)}
-              </>
-            );
-          })()}
-          {tail.map((c, i) => (
-            <CaptionCard
-              key={c.seq}
-              cap={c}
-              speakers={speakerMap}
-              live={recording && i === tail.length - 1}
-              onStar={(seq) => session && api.star(session.id, seq).catch(() => {})}
-            />
-          ))}
+          {capped && (
+            <div className="rounded-lg border border-line bg-panel px-3 py-1.5 text-center text-[11px] text-tx3">
+              為維持效能僅顯示最新 1000 句;完整內容請至「紀錄庫」檢視
+            </div>
+          )}
+          <CaptionOutline
+            captions={captions}
+            speakers={speakerMap}
+            live={recording}
+            onStar={(seq) => session && api.star(session.id, seq).catch(() => {})}
+          />
           {summary && (
             <div className="whitespace-pre-wrap rounded-xl border border-line border-l-4 border-l-brand bg-panel px-4 py-3 text-[13px] text-tx2">
               {summary}

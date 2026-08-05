@@ -93,6 +93,22 @@ fn restart_engine(state: tauri::State<EngineProc>) -> Result<String, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 任何 panic 落地到 ~/.konjac/app-crash.log,閃退不再無跡可查
+    std::panic::set_hook(Box::new(|info| {
+        if let Some(home) = std::env::var_os("USERPROFILE") {
+            let dir = PathBuf::from(home).join(".konjac");
+            let _ = std::fs::create_dir_all(&dir);
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join("app-crash.log"))
+            {
+                use std::io::Write;
+                let _ = writeln!(f, "[panic] {info}");
+            }
+        }
+    }));
+
     tauri::Builder::default()
         .manage(EngineProc(Mutex::new(None)))
         .plugin(

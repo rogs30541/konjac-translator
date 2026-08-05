@@ -2,10 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { ENGINE_WS } from "./api";
 import type { Caption, WsEvent } from "./types";
 
+// 即時視圖記憶體上限:僅保留最新 N 句(完整內容永遠在紀錄庫);
+// 防止超長錄製讓 WebView 記憶體無限成長
+const MAX_LIVE_CAPTIONS = 1000;
+
 /** 訂閱 session 字幕流:自動重連,以 seq 去重(引擎重連會補發 final)。 */
 export function useCaptionStream(sessionId: string | null) {
   const [captions, setCaptions] = useState<Caption[]>([]);
   const [connected, setConnected] = useState(false);
+  const [capped, setCapped] = useState(false);
   const [lastEvent, setLastEvent] = useState<WsEvent | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -26,12 +31,18 @@ export function useCaptionStream(sessionId: string | null) {
           const cap = ev.data as unknown as Caption;
           setCaptions((prev) => {
             const i = prev.findIndex((c) => c.seq === cap.seq);
+            let next: Caption[];
             if (i >= 0) {
-              const next = prev.slice();
+              next = prev.slice();
               next[i] = cap;
-              return next;
+            } else {
+              next = [...prev, cap].sort((a, b) => a.seq - b.seq);
             }
-            return [...prev, cap].sort((a, b) => a.seq - b.seq);
+            if (next.length > MAX_LIVE_CAPTIONS) {
+              setCapped(true);
+              next = next.slice(next.length - MAX_LIVE_CAPTIONS);
+            }
+            return next;
           });
         }
       };
@@ -49,5 +60,5 @@ export function useCaptionStream(sessionId: string | null) {
     };
   }, [sessionId]);
 
-  return { captions, connected, lastEvent, setCaptions };
+  return { captions, connected, capped, lastEvent, setCaptions };
 }

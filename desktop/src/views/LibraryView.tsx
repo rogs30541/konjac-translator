@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
-import CaptionCard from "../components/CaptionCard";
+import CaptionOutline from "../components/CaptionOutline";
 import ForwardDialog from "../components/ForwardDialog";
 import SpeakerPanel from "../components/SpeakerPanel";
 import type { Caption, Session, Speaker } from "../types";
@@ -221,9 +221,13 @@ export default function LibraryView({
 
             <div className="mt-4 grid grid-cols-[1fr_200px] gap-4">
               <div className="flex flex-col gap-2.5">
-                {captions.map((c) => (
-                  <CaptionCard key={c.seq} cap={c} speakers={speakerMap} />
-                ))}
+                <CaptionOutline
+                  captions={captions}
+                  speakers={speakerMap}
+                  collapseAll
+                  onStar={(seq) =>
+                    api.star(s.id, seq).then(() => openDetail(s.id)).catch(() => {})}
+                />
                 {captions.length === 0 && (
                   <div className="text-[12.5px] text-tx3">(無字幕資料)</div>
                 )}

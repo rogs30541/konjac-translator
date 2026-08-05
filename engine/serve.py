@@ -11,7 +11,10 @@ from pathlib import Path
 if sys.stdout is None or sys.stderr is None:
     _log_dir = Path.home() / ".konjac"
     _log_dir.mkdir(parents=True, exist_ok=True)
-    _log = open(_log_dir / "engine.log", "a", buffering=1, encoding="utf-8")
+    _log_path = _log_dir / "engine.log"
+    if _log_path.is_file() and _log_path.stat().st_size > 10 * 1024 * 1024:
+        _log_path.replace(_log_path.with_suffix(".log.old"))  # 10MB 輪替
+    _log = open(_log_path, "a", buffering=1, encoding="utf-8")
     sys.stdout = sys.stdout or _log
     sys.stderr = sys.stderr or _log
 
