@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from pathlib import Path
 
 from .db import Store
 from .hub import Hub
@@ -143,9 +144,27 @@ class LiveRunner:
             if llm is not None and c.translated_text is None:
                 asyncio.ensure_future(self._translate_async(cap))
         else:
+            if etype == "output_files":
+                self._capture_recording_path(event)
             # summary/status/output_files 等其餘事件原樣轉給前端
             await self._hub.broadcast(
                 self._sid, WsEvent(type="engine", data=event))
+
+    def _capture_recording_path(self, event: dict) -> None:
+        """上游優雅停止時回報輸出檔清單,擷取錄音檔供講者精析。
+        上游會把 wav 轉存 mp3 後刪原檔,故同名互換副檔名也要試。"""
+        from .providers.jt_bridge import vendor_dir
+        for f in event.get("files", []):
+            rel = f.get("path") or ""
+            if not rel.lower().endswith((".wav", ".mp3", ".m4a")):
+                continue
+            p = Path(rel)
+            if not p.is_absolute():
+                p = vendor_dir() / rel
+            for cand in (p, p.with_suffix(".mp3"), p.with_suffix(".wav")):
+                if cand.is_file():
+                    self._store.set_recording_path(self._sid, str(cand))
+                    return
 
     async def _translate_async(self, cap: CaptionIn) -> None:
         llm = self._llm_getter()
@@ -205,6 +224,28 @@ class LiveManager:
         if not runner:
             return False
         await runner.stop()
+        self._fallback_recording_scan(store, sid)
         store.set_status(sid, SessionStatus.done, ended=True)
         await hub.broadcast(sid, WsEvent(type="status", data={"status": "done"}))
         return True
+
+    @staticmethod
+    def _fallback_recording_scan(store: Store, sid: str) -> None:
+        """output_files 事件沒接到時的保險:掃 vendor recordings 目錄,
+        取本場 session 期間新建的最新錄音檔。"""
+        from datetime import datetime, timezone
+
+        from .providers.jt_bridge import vendor_dir
+        s = store.get_session(sid)
+        if not s or s.recording_path:
+            return
+        rec_dir = vendor_dir() / "recordings"
+        if not rec_dir.is_dir():
+            return
+        started = s.created_at.timestamp()
+        cands = [p for p in rec_dir.iterdir()
+                 if p.suffix.lower() in (".mp3", ".wav", ".m4a")
+                 and p.stat().st_mtime >= started - 5]
+        if cands:
+            newest = max(cands, key=lambda p: p.stat().st_mtime)
+            store.set_recording_path(sid, str(newest))

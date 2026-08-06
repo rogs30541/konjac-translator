@@ -349,6 +349,45 @@ def create_app(store: Optional[Store] = None,
             type="speaker", data={"id": speaker_id, "display_name": req.display_name}))
         return st.list_speakers(sid)
 
+    # ---------- 錄後講者精析(離線重跑:原生講者辨識 + 精準時間戳)----------
+    @app.post("/api/sessions/{sid}/diarize")
+    async def diarize_session(sid: str):
+        s = _session_or_404(sid)
+        if s.status == SessionStatus.recording:
+            raise HTTPException(409, "錄製中無法分析,請先停止")
+        if not s.recording_path or not Path(s.recording_path).is_file():
+            raise HTTPException(
+                400, "此場次沒有可用的錄音檔(需為新版即時錄製,或錄音檔已被清理)")
+        try:
+            caps_new = await app.state.get_offline().transcribe_file(
+                s.recording_path,
+                mode=UPSTREAM_ASR_MODE.get(s.mode, s.mode), diarize=True)
+        except Exception as e:
+            raise HTTPException(502, f"講者精析失敗:{e}")
+        if not caps_new:
+            raise HTTPException(502, "講者精析未產生任何字幕,原紀錄保持不變")
+        # 以精析結果整批取代(時間戳為真實音檔秒數、含講者)
+        st.delete_captions_and_speakers(sid)
+        for c in caps_new:
+            st.upsert_caption(sid, c)
+        # 翻譯模式:雲端 LLM 批次補譯
+        llm = app.state.get_llm()
+        if llm and needs_translation(s.mode):
+            for c in caps_new:
+                if c.translated_text:
+                    continue
+                try:
+                    t = await llm.translate(c.source_text, s.mode, s.topic)
+                except Exception:
+                    continue
+                if t:
+                    st.upsert_caption(sid, c.model_copy(
+                        update={"translated_text": t}))
+        speakers = st.list_speakers(sid)
+        await hub.broadcast(sid, WsEvent(type="status", data={"status": "done"}))
+        return {"updated": len(caps_new),
+                "speakers": [sp.model_dump() for sp in speakers]}
+
     # ---------- summary ----------
     @app.post("/api/sessions/{sid}/summary")
     async def make_summary(sid: str, template: str = "general"):

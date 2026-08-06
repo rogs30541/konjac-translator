@@ -44,6 +44,7 @@ class Session(BaseModel):
     ended_at: Optional[datetime] = None
     notebooklm_forwarded_at: Optional[datetime] = None
     notebooklm_target: Optional[str] = None
+    recording_path: Optional[str] = None  # live --record 的錄音檔(講者分析用)
 
 
 class Speaker(BaseModel):

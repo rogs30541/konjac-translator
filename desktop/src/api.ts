@@ -67,6 +67,8 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ display_name: name }),
     }),
+  diarize: (id: string) =>
+    req<{ updated: number }>(`/api/sessions/${id}/diarize`, { method: "POST" }),
   summarize: (id: string, template = "general") =>
     req<{ content_md: string }>(
       `/api/sessions/${id}/summary?template=${template}`, { method: "POST" }),

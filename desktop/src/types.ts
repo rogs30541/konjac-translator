@@ -10,6 +10,7 @@ export interface Session {
   ended_at: string | null;
   notebooklm_forwarded_at: string | null;
   notebooklm_target: string | null;
+  recording_path?: string | null;
 }
 
 export interface Speaker {

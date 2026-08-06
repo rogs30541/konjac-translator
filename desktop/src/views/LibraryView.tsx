@@ -208,6 +208,27 @@ export default function LibraryView({
               >
                 📤 NotebookLM
               </button>
+              {s.recording_path && (
+                <button
+                  onClick={async () => {
+                    setBusy(true);
+                    setMsg("👥 講者精析中…(以錄音重新分析,長度較長時需數分鐘)");
+                    try {
+                      const r = await api.diarize(s.id);
+                      setMsg(`✓ 講者精析完成,${r.updated} 句已歸屬講者`);
+                      openDetail(s.id);
+                    } catch (e) {
+                      setMsg(String(e));
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  disabled={busy}
+                  className="rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12px] disabled:opacity-40"
+                >
+                  👥 講者精析
+                </button>
+              )}
               <button
                 onClick={() => deleteOne(s.id)}
                 disabled={busy || s.status === "recording"}

@@ -49,7 +49,8 @@ export default function LiveView({
   };
 
   const recording = session?.status === "recording";
-  const { captions, connected, capped, lastEvent } = useCaptionStream(session?.id ?? null);
+  const { captions, connected, capped, lastEvent, setCaptions } =
+    useCaptionStream(session?.id ?? null);
   const streamRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -325,6 +326,31 @@ export default function LiveView({
             session && api.renameSpeaker(session.id, id, name).then(setSpeakers).catch(() => {})
           }
         />
+        {recording && speakers.length === 0 && (
+          <div className="mt-2 text-[11px] leading-relaxed text-tx3">
+            即時模式不即時標講者;停止錄製後按「講者精析」以錄音重新分析歸屬。
+          </div>
+        )}
+        {!recording && session?.status === "done" && session.recording_path && (
+          <button
+            onClick={async () => {
+              setError("👥 講者精析中…(重新分析錄音,長度較長時需數分鐘)");
+              try {
+                const r = await api.diarize(session.id);
+                const fresh = await api.captions(session.id);
+                setCaptions(fresh);
+                const d = await api.getSession(session.id);
+                setSpeakers(d.speakers);
+                setError(`✓ 講者精析完成:${r.updated} 句、${d.speakers.length} 位講者`);
+              } catch (e) {
+                setError(String(e));
+              }
+            }}
+            className="mt-2 w-full rounded-lg border border-line bg-panel2 px-3 py-2 text-[12px]"
+          >
+            👥 講者精析
+          </button>
+        )}
         {kwHits.size > 0 && (
           <>
             <h4 className="mb-2 mt-5 text-[11px] uppercase tracking-wider text-tx3">

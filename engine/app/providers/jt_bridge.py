@@ -22,6 +22,13 @@ OnEvent = Callable[[dict], Awaitable[None]]
 
 # 引擎(--noconsole)生 console 子程序時 Windows 會另開視窗;全部隱藏執行
 CREATE_NO_WINDOW = 0x0800_0000 if os.name == "nt" else 0
+# 跨 console 優雅停止:helper 附掛到子程序的(隱藏)console 送 Ctrl+C,
+# 上游以 KeyboardInterrupt 完整收尾(寫出錄音檔、回報 output_files)
+_INTERRUPT_HELPER = (
+    "import ctypes,sys;k=ctypes.windll.kernel32;pid=int(sys.argv[1]);"
+    "k.FreeConsole();"
+    "k.AttachConsole(pid) and ("
+    "k.SetConsoleCtrlHandler(None, True), k.GenerateConsoleCtrlEvent(0, 0))")
 
 
 # 上游 13623 行把中/日文模式的 ASR 強制改回 whisper.cpp(未編譯即死),
@@ -161,6 +168,7 @@ class JtLiveBridge:
             self._cfg.python_exe, str(self._cfg.script),
             "--webui", "--mode", mode,
             "--asr", "faster-whisper", "--local-asr", "-d", "-100",
+            "--record",  # 保留錄音檔,供停止後講者分析
             *self._cfg.extra_args,
             cwd=str(self._cfg.script.parent), env=env,
             stdin=asyncio.subprocess.PIPE,
@@ -195,15 +203,28 @@ class JtLiveBridge:
             writer.close()
 
     async def stop(self) -> None:
-        """graceful terminate → 3 秒後 kill(參考上游 webui.py 三段停止)。"""
-        self._closed = True
+        """三段停止(參考上游 webui.py):CTRL_BREAK 優雅停止(上游收尾
+        錄音檔並回報 output_files)→ terminate → kill。"""
         if self._proc and self._proc.returncode is None:
-            self._proc.terminate()
-            try:
-                await asyncio.wait_for(self._proc.wait(), timeout=3.0)
-            except asyncio.TimeoutError:
-                self._proc.kill()
-                await self._proc.wait()
+            graceful = False
+            if os.name == "nt":
+                try:
+                    helper = await asyncio.create_subprocess_exec(
+                        self._cfg.python_exe, "-c", _INTERRUPT_HELPER,
+                        str(self._proc.pid), creationflags=CREATE_NO_WINDOW)
+                    await asyncio.wait_for(helper.wait(), timeout=5.0)
+                    await asyncio.wait_for(self._proc.wait(), timeout=8.0)
+                    graceful = True
+                except (asyncio.TimeoutError, Exception):
+                    graceful = False
+            if not graceful and self._proc.returncode is None:
+                self._proc.terminate()
+                try:
+                    await asyncio.wait_for(self._proc.wait(), timeout=3.0)
+                except asyncio.TimeoutError:
+                    self._proc.kill()
+                    await self._proc.wait()
+        self._closed = True
         if self._server:
             self._server.close()
             await self._server.wait_closed()

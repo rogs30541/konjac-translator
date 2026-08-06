@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at TEXT NOT NULL,
     ended_at TEXT,
     notebooklm_forwarded_at TEXT,
-    notebooklm_target TEXT
+    notebooklm_target TEXT,
+    recording_path TEXT
 );
 CREATE TABLE IF NOT EXISTS speakers (
     id TEXT NOT NULL,
@@ -67,6 +68,12 @@ class Store:
         self._lock = threading.Lock()
         with self._lock:
             self._conn.executescript(_SCHEMA)
+            # 舊資料庫遷移:補 recording_path 欄位
+            cols = {r["name"] for r in
+                    self._conn.execute("PRAGMA table_info(sessions)")}
+            if "recording_path" not in cols:
+                self._conn.execute(
+                    "ALTER TABLE sessions ADD COLUMN recording_path TEXT")
             self._conn.commit()
 
     # ---- sessions ----
@@ -92,7 +99,14 @@ class Store:
             created_at=_dt(row["created_at"]), ended_at=_dt(row["ended_at"]),
             notebooklm_forwarded_at=_dt(row["notebooklm_forwarded_at"]),
             notebooklm_target=row["notebooklm_target"],
+            recording_path=row["recording_path"],
         )
+
+    def set_recording_path(self, sid: str, path: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE sessions SET recording_path=? WHERE id=?", (path, sid))
+            self._conn.commit()
 
     def list_sessions(self) -> list[Session]:
         rows = self._conn.execute(
@@ -208,6 +222,15 @@ class Store:
             speaker_id=r["speaker_id"], source_channel=r["source_channel"],
             source_text=r["source_text"], translated_text=r["translated_text"],
             is_final=bool(r["is_final"]), starred=bool(r["starred"])) for r in rows]
+
+    def delete_captions_and_speakers(self, session_id: str) -> None:
+        """講者精析:以離線重跑結果整批取代前,先清空舊字幕與講者。"""
+        with self._lock:
+            self._conn.execute("DELETE FROM captions WHERE session_id=?",
+                               (session_id,))
+            self._conn.execute("DELETE FROM speakers WHERE session_id=?",
+                               (session_id,))
+            self._conn.commit()
 
     def star_caption(self, session_id: str, seq: int, starred: bool = True) -> bool:
         with self._lock:
