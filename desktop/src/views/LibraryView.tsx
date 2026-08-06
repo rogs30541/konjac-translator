@@ -175,14 +175,21 @@ export default function LibraryView({
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {["md", "txt", "srt", "vtt"].map((f) => (
-                <a
+                <button
                   key={f}
-                  href={api.exportUrl(s.id, f)}
-                  target="_blank"
-                  className="rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12px] uppercase"
+                  disabled={busy}
+                  onClick={async () => {
+                    try {
+                      const r = await api.exportSave(s.id, f);
+                      setMsg(`✓ 已儲存到下載資料夾:${r.filename}(已開啟檔案總管)`);
+                    } catch (e) {
+                      setMsg(String(e));
+                    }
+                  }}
+                  className="rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12px] uppercase disabled:opacity-40"
                 >
-                  {f}
-                </a>
+                  ⬇ {f}
+                </button>
               ))}
               <select
                 value={template}

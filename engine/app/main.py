@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -78,7 +79,8 @@ def create_app(store: Optional[Store] = None,
                offline_pipeline=None, summarizer=None,
                bridge_factory=None,
                settings_store: Optional[SettingsStore] = None,
-               llm_factory=None, webhook_client=None) -> FastAPI:
+               llm_factory=None, webhook_client=None,
+               downloads_dir: Optional[Path] = None) -> FastAPI:
     app = FastAPI(title="翻譯蒟蒻 Engine", version=ENGINE_VERSION)
     # 桌面前端來源(Vite dev / Tauri WebView);引擎本身仍只綁 127.0.0.1
     app.add_middleware(
@@ -89,6 +91,7 @@ def create_app(store: Optional[Store] = None,
         allow_methods=["*"], allow_headers=["*"])
     app.state.store = store or Store()
     app.state.hub = Hub()
+    app.state.downloads_dir = downloads_dir or (Path.home() / "Downloads")
     # 離線管線:call-time 動態選擇(設定頁改 vendor 路徑即時生效)
     app.state.offline_injected = offline_pipeline
 
@@ -403,6 +406,27 @@ def create_app(store: Optional[Store] = None,
         return result
 
     # ---------- export ----------
+    @app.post("/api/sessions/{sid}/export/save")
+    async def export_save(sid: str, format: str = "md", reveal: bool = True):
+        """實際存檔:寫入下載資料夾並(可選)開檔案總管選取。"""
+        s = _session_or_404(sid)
+        if format not in EXPORTERS:
+            raise HTTPException(400, f"unknown format: {format}")
+        content = (to_notebooklm_markdown(st, s, scope="full")
+                   if format == "md" else EXPORTERS[format](st, s))
+        safe_title = re.sub(r'[\\/:*?"<>|]', "_", s.title)[:60].strip() or "紀錄"
+        fname = f"{safe_title}_{s.created_at.strftime('%Y%m%d_%H%M')}.{format}"
+        out_dir = app.state.downloads_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / fname
+        out_path.write_text(content, encoding="utf-8-sig")  # BOM:Word/Excel 開啟不亂碼
+        if reveal and os.name == "nt":
+            try:
+                subprocess.Popen(["explorer", "/select,", str(out_path)])
+            except OSError:
+                pass
+        return {"path": str(out_path), "filename": fname}
+
     @app.get("/api/sessions/{sid}/export")
     async def export(sid: str, format: str = "md", scope: str = "full"):
         s = _session_or_404(sid)

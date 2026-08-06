@@ -22,9 +22,11 @@ from app.providers.mock import MockOfflinePipeline  # noqa: E402
 @pytest.fixture()
 def client(store: Store, tmp_path):
     # settings 隔離 + 顯式 mock 離線管線(預設接線現在會抓真實 vendor)
+    # downloads_dir 隔離:存檔測試不寫真實下載資料夾
     app = create_app(store=store,
                      offline_pipeline=MockOfflinePipeline(),
-                     settings_store=SettingsStore(tmp_path / "settings.json"))
+                     settings_store=SettingsStore(tmp_path / "settings.json"),
+                     downloads_dir=tmp_path / "downloads")
     with TestClient(app) as c:
         yield c
 

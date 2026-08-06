@@ -293,13 +293,17 @@ export default function LiveView({
             🔊 音訊診斷
           </button>
           {session && (
-            <a
-              href={api.exportUrl(session.id, "md")}
-              target="_blank"
+            <button
+              onClick={() =>
+                api
+                  .exportSave(session.id, "md")
+                  .then((r) => setError(`✓ 已儲存到下載資料夾:${r.filename}`))
+                  .catch((e) => setError(String(e)))
+              }
               className="rounded-lg border border-line bg-panel2 px-4 py-2 text-[12.5px]"
             >
               ⬇ 匯出 MD
-            </a>
+            </button>
           )}
           <div className="flex-1" />
           <button

@@ -1,4 +1,6 @@
 """匯出格式(md/txt/srt/vtt)與 NotebookLM 轉發流程。"""
+from pathlib import Path
+
 from conftest import ingest
 
 
@@ -43,6 +45,26 @@ def test_txt_srt_vtt(client, live_session):
     assert "00:14:10.200 --> 00:14:13.000" in vtt
 
     assert client.get(f"/api/sessions/{sid}/export?format=doc").status_code == 400
+
+
+def test_export_save_to_downloads(client, live_session, tmp_path):
+    """實際存檔:寫入下載資料夾、檔名含標題與時間、內容完整。"""
+    sid = live_session
+    _seed(client, sid)
+    r = client.post(f"/api/sessions/{sid}/export/save?format=md&reveal=false")
+    assert r.status_code == 200
+    body = r.json()
+    p = Path(body["path"])
+    assert p.is_file() and p.parent == tmp_path / "downloads"
+    assert body["filename"].endswith(".md") and "產品開發會議" in body["filename"]
+    content = p.read_text(encoding="utf-8-sig")
+    assert "## 逐字稿" in content
+    assert "我們需要確定第三季路線圖。" in content  # 完整逐字稿在檔內
+
+    r2 = client.post(f"/api/sessions/{sid}/export/save?format=srt&reveal=false")
+    assert Path(r2.json()["path"]).suffix == ".srt"
+    assert client.post(
+        f"/api/sessions/{sid}/export/save?format=doc&reveal=false").status_code == 400
 
 
 def test_forward_notebooklm_and_dedupe(client, live_session):

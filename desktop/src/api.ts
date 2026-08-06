@@ -74,6 +74,10 @@ export const api = {
       `/api/sessions/${id}/summary?template=${template}`, { method: "POST" }),
   exportUrl: (id: string, format: string) =>
     `${ENGINE_BASE}/api/sessions/${id}/export?format=${format}`,
+  exportSave: (id: string, format: string) =>
+    req<{ path: string; filename: string }>(
+      `/api/sessions/${id}/export/save?format=${format}&reveal=true`,
+      { method: "POST" }),
   forwardNotebookLM: (
     id: string, notebook: string, scope: string, force = false, openBrowser = false,
   ) =>

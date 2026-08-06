@@ -84,9 +84,14 @@ export default function ForwardDialog({ session, onClose, onDone }: Props) {
           ))}
         </div>
 
-        <div className="mt-3 text-[11.5px] text-tx3">內容預覽(Markdown)</div>
-        <pre className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-line bg-bg px-3 py-2 font-mono text-[11px] leading-relaxed text-tx2">
-          {preview.slice(0, 2000)}
+        <div className="mt-3 flex items-baseline gap-2 text-[11.5px] text-tx3">
+          <span>內容預覽(Markdown)</span>
+          <span className="text-[10.5px]">
+            完整 {preview.length.toLocaleString()} 字,全部都會複製
+          </span>
+        </div>
+        <pre className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border border-line bg-bg px-3 py-2 font-mono text-[11px] leading-relaxed text-tx2">
+          {preview}
         </pre>
 
         {msg && <div className="mt-2 text-[12px] text-brand">{msg}</div>}
